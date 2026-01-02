@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Cute Otter Icon -->
+  <defs>
+    <radialGradient id="otterGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#8B6F47;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6B5537;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <!-- Otter head -->
+  <ellipse cx="50" cy="50" rx="35" ry="40" fill="url(#otterGradient)"/>
+
+  <!-- Otter ears -->
+  <ellipse cx="28" cy="30" rx="10" ry="12" fill="#6B5537"/>
+  <ellipse cx="72" cy="30" rx="10" ry="12" fill="#6B5537"/>
+
+  <!-- Otter face (lighter patch) -->
+  <ellipse cx="50" cy="60" rx="25" ry="20" fill="#B8956A"/>
+
+  <!-- Otter eyes -->
+  <circle cx="40" cy="48" r="5" fill="#2C1810"/>
+  <circle cx="60" cy="48" r="5" fill="#2C1810"/>
+  <circle cx="42" cy="46" r="2" fill="#FFFFFF"/>
+  <circle cx="62" cy="46" r="2" fill="#FFFFFF"/>
+
+  <!-- Otter nose -->
+  <ellipse cx="50" cy="62" rx="6" ry="4" fill="#2C1810"/>
+
+  <!-- Otter whiskers -->
+  <line x1="20" y1="58" x2="35" y2="60" stroke="#2C1810" stroke-width="1"/>
+  <line x1="20" y1="62" x2="35" y2="62" stroke="#2C1810" stroke-width="1"/>
+  <line x1="80" y1="58" x2="65" y2="60" stroke="#2C1810" stroke-width="1"/>
+  <line x1="80" y1="62" x2="65" y2="62" stroke="#2C1810" stroke-width="1"/>
+
+  <!-- Happy smile -->
+  <path d="M 42 68 Q 50 72 58 68" stroke="#2C1810" stroke-width="2" fill="none"/>
+</svg>

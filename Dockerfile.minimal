@@ -1,0 +1,34 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install all dependencies without cache
+COPY package*.json ./
+COPY client/package*.json ./client/
+
+# Use npm install instead of ci to avoid cache issues
+RUN npm install && \
+    cd client && npm install
+
+# Copy all source code
+COPY . .
+
+# Build client
+RUN cd client && npm run build
+
+# Production setup
+RUN npm install --omit=dev && \
+    npm cache clean --force && \
+    rm -rf client/node_modules
+
+# Create data directories
+RUN mkdir -p /app/data /app/journal && \
+    chown -R node:node /app/data /app/journal
+
+EXPOSE 8000
+ENV NODE_ENV=production
+# SECURITY: Set ADMIN_PASSWORD and JWT_SECRET at runtime via docker-compose.yml or docker run -e
+# DO NOT hardcode secrets in the image
+
+USER node
+CMD ["npm", "start"]

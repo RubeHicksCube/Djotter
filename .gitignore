@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Database
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Build outputs
+client/dist/
+client/build/
+
+# Logs
+*.log
+npm-debug.log*
+client/client.log
+server/server.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Production files
+data/
+!data/.gitkeep
+
+# Development
+AGENTS.md
+*.test.js
+*.spec.js

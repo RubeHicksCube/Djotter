@@ -1,0 +1,66 @@
+{
+  "name": "djotter",
+  "version": "1.0.0",
+  "description": "Djotter - Daily Jotter: An otter-themed, self-hosted daily journal application for logging activities minute-by-minute and exporting to second-brain apps.",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "PORT=8000 nodemon server/index.js",
+    "client:dev": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "PORT=8000 node server/index.js",
+    "init-db": "node server/scripts/initDatabase.js",
+    "seed-topics": "node server/scripts/seedTopics.js",
+    "seed-life": "node server/scripts/seedLifeTopics.js",
+    "docker:build": "docker build -t djotter .",
+    "docker:build:cached": "docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t djotter .",
+    "docker:run": "docker run -p 8000:8000 --name djotter djotter",
+    "docker:stop": "docker stop djotter && docker rm djotter"
+  },
+  "keywords": [
+    "health",
+    "journal",
+    "jotter",
+    "otter",
+    "life-management",
+    "activity-tracker",
+    "self-hosted",
+    "docker",
+    "wellness",
+    "personal-productivity",
+    "therapy",
+    "markdown"
+  ],
+  "author": "Djotter",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RubeHicksCube/Djotter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RubeHicksCube/Djotter/issues"
+  },
+  "homepage": "https://github.com/RubeHicksCube/Djotter#readme",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^9.6.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "marked": "^11.2.0",
+    "node-cache": "^5.1.2",
+    "pdfkit": "^0.17.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.2"
+  }
+}
