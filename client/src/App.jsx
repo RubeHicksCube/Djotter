@@ -17,7 +17,7 @@ function AuthenticatedApp() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
-  
+
   // User Management modal state (available on all pages)
   const [showUserManagement, setShowUserManagement] = useState(false);
 
@@ -160,15 +160,15 @@ function AuthenticatedApp() {
           </Routes>
         </main>
 
-          {/* User Management Modal - Available on All Pages */}
-          <UserManagementModal
-            isOpen={showUserManagement}
-            onClose={handleCloseUserManagement}
-            currentUser={user}
-          />
-        </div>
-      </UserSettingsProvider>
-    );
+        {/* User Management Modal - Available on All Pages */}
+        <UserManagementModal
+          isOpen={showUserManagement}
+          onClose={handleCloseUserManagement}
+          currentUser={user}
+        />
+      </div>
+    </UserSettingsProvider>
+  );
 }
 
 function App() {

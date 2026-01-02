@@ -85,12 +85,18 @@ export default function Profile() {
     loadRetentionSettings();
     loadQuickStats();
 
-    // Listen for focus to refresh user data (for admin accounts that create users)
+    // Listen for custom event to open User Management modal
+    const handleOpenUserManagement = () => {
+      setShowUserManagement(true);
+    };
+
+    // Refresh available dates when page gains focus
     const handleFocus = () => {
       loadAvailableDates();
       loadQuickStats();
     };
 
+    window.addEventListener('openUserManagement', handleOpenUserManagement);
     window.addEventListener('focus', handleFocus);
 
     // Also refresh every 5 seconds to catch saves from nav
@@ -100,6 +106,7 @@ export default function Profile() {
     }, 5000);
 
     return () => {
+      window.removeEventListener('openUserManagement', handleOpenUserManagement);
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
     };
@@ -711,7 +718,7 @@ export default function Profile() {
 
             {/* User Management Content */}
             <div style={{ padding: '1rem 0' }}>
-            {(
+            {currentUser.is_admin && (
             <>
               <button
                 onClick={() => setShowCreateUser(!showCreateUser)}
