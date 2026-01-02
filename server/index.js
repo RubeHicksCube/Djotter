@@ -965,16 +965,16 @@ app.put('/api/users/:id', authMiddleware, (req, res) => {
 app.delete('/api/users/:id', authMiddleware, (req, res) => {
   const { id } = req.params;
 
-  // Check if user is admin
-  if (!req.user || !req.user.is_admin) {
+  const userId = parseInt(id);
+
+  // Check if user is admin or deleting their own account
+  if (!req.user || (!req.user.is_admin && userId !== req.user.id)) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
-  const userId = parseInt(id);
-
-  // Prevent deleting yourself
-  if (userId === req.user.id) {
-    return res.status(400).json({ error: 'Cannot delete your own account' });
+  // Allow users to delete their own account, but prevent admins from deleting themselves
+  if (userId === req.user.id && req.user.is_admin) {
+    return res.status(400).json({ error: 'Admins cannot delete their own account through User Management' });
   }
 
   // Find user
@@ -984,10 +984,18 @@ app.delete('/api/users/:id', authMiddleware, (req, res) => {
   }
 
   const deletedUsername = targetUser.username;
+  const isSelfDeletion = userId === req.user.id;
+  
+  // Delete the user
   dataAccess.deleteUser(userId);
 
-  console.log(`Admin deleted user: ${deletedUsername}`);
-  res.json({ success: true, message: 'User deleted successfully' });
+  if (isSelfDeletion) {
+    console.log(`User deleted their own account: ${deletedUsername}`);
+    res.json({ success: true, message: 'Your account has been deleted successfully' });
+  } else {
+    console.log(`Admin deleted user: ${deletedUsername}`);
+    res.json({ success: true, message: 'User deleted successfully' });
+  }
 });
 
 // Get current state (Home page data)

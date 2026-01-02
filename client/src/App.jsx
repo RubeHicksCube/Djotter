@@ -16,6 +16,9 @@ function AuthenticatedApp() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  
+  // User Management modal state (available on all pages)
+  const [showUserManagement, setShowUserManagement] = useState(false);
 
   useEffect(() => {
     // Check authentication on mount
@@ -41,6 +44,15 @@ function AuthenticatedApp() {
 
     setLoading(false);
   }, []);
+
+  // User Management handlers (available on all pages)
+  const handleOpenUserManagement = () => {
+    setShowUserManagement(true);
+  };
+
+  const handleCloseUserManagement = () => {
+    setShowUserManagement(false);
+  };
 
   const toggleTheme = (darkMode) => {
     // If called with a parameter, use it; otherwise toggle
@@ -129,16 +141,7 @@ function AuthenticatedApp() {
                     isDarkMode={isDarkMode}
                     onThemeChange={toggleTheme}
                     isAdmin={user.is_admin}
-                    onOpenUserManagement={() => {
-                      // Navigate to profile if not there
-                      if (window.location.pathname !== '/profile') {
-                        window.location.href = '/profile';
-                      }
-                      // Dispatch custom event to open modal
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('openUserManagement'));
-                      }, 100);
-                    }}
+                    onOpenUserManagement={handleOpenUserManagement}
                   />
                   <button onClick={handleLogout} className="btn btn-sm btn-secondary">Logout</button>
                 </>
@@ -155,9 +158,73 @@ function AuthenticatedApp() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
-      </div>
-    </UserSettingsProvider>
-  );
+
+          {/* User Management Modal - Available on All Pages */}
+          {showUserManagement && (
+            <div
+              className="modal-overlay"
+              onClick={handleCloseUserManagement}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2000,
+                padding: '2rem'
+              }}
+            >
+              <div
+                className="card admin-section"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  maxWidth: '400px',
+                  width: '100%',
+                  padding: '2rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3>
+                    {user ? (user.is_admin ? '👥 User Management' : '👤 Account Settings') : 'Loading...'}
+                  </h3>
+                  <button
+                    onClick={handleCloseUserManagement}
+                    className="btn btn-sm btn-ghost"
+                    style={{ fontSize: '1.5rem' }}
+                    title="Close"
+                  >
+                    ✖
+                  </button>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ marginBottom: '1rem' }}>
+                    {user ? (
+                      user.is_admin ? 
+                        'Please go to the Profile page to manage users and create new accounts.' :
+                        'Your account settings and profile management are available on the Profile page.'
+                    ) : 'Loading...'}
+                  </p>
+                  {user && (
+                    <button
+                      onClick={() => {
+                        window.location.href = '/profile';
+                      }}
+                      className="btn btn-primary"
+                    >
+                      Go to Profile
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </UserSettingsProvider>
+    );
 }
 
 function App() {

@@ -119,8 +119,8 @@ export default function SettingsDropdown({ username, isDarkMode, onThemeChange, 
               </div>
             </div>
 
-            {/* User Management (Admin Only) */}
-            {isAdmin && onOpenUserManagement && (
+            {/* User Management - Available for all users */}
+            {onOpenUserManagement && (
               <>
                 <div style={{ borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }}></div>
                 <div className="settings-item">
@@ -132,7 +132,7 @@ export default function SettingsDropdown({ username, isDarkMode, onThemeChange, 
                     className="btn btn-sm btn-primary"
                     style={{ width: '100%' }}
                   >
-                    👥 User Management
+                    {isAdmin ? '👥 User Management' : '👤 Account Settings'}
                   </button>
                 </div>
               </>

@@ -85,19 +85,8 @@ export default function Profile() {
     loadRetentionSettings();
     loadQuickStats();
 
-    // Listen for custom event to open User Management modal
-    const handleOpenUserManagement = () => {
-      setShowUserManagement(true);
-    };
-
-    // Refresh available dates when page gains focus
-    const handleFocus = () => {
-      loadAvailableDates();
-      loadQuickStats();
-    };
-
-    window.addEventListener('openUserManagement', handleOpenUserManagement);
-    window.addEventListener('focus', handleFocus);
+  // Listen for focus to refresh user data (for admin accounts that create users)
+  window.addEventListener('focus', handleFocus);
 
     // Also refresh every 5 seconds to catch saves from nav
     const interval = setInterval(() => {
@@ -106,7 +95,6 @@ export default function Profile() {
     }, 5000);
 
     return () => {
-      window.removeEventListener('openUserManagement', handleOpenUserManagement);
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
     };
@@ -140,10 +128,13 @@ export default function Profile() {
         confirmPassword: ''
       });
 
-      // Load all users if admin
+      // Load users based on role
       if (userResponse.user.is_admin) {
         const usersResponse = await api.getAllUsers();
         setUsers(usersResponse.users);
+      } else {
+        // For regular users, show only themselves
+        setUsers([userResponse.user]);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -268,7 +259,16 @@ export default function Profile() {
 
   const handleDeleteUser = async (userId) => {
     const user = users.find(u => u.id === userId);
-    if (!confirm(`Delete user "${user.username}"? This action cannot be undone.`)) return;
+    const isSelfDeletion = userId === currentUser.id;
+    
+    let confirmationMessage;
+    if (isSelfDeletion) {
+      confirmationMessage = `⚠️ Delete your account "${user.username}"?\n\nThis will permanently delete:\n• Your profile and all data\n• Activity entries and logs\n• Trackers and counters\n• Tasks and custom fields\n\nThis action cannot be undone. Are you sure?`;
+    } else {
+      confirmationMessage = `Delete user "${user.username}"? This action cannot be undone.`;
+    }
+    
+    if (!confirm(confirmationMessage)) return;
 
     try {
       const response = await api.deleteUser(userId);
@@ -654,8 +654,8 @@ export default function Profile() {
             />
           </div>
 
-      {/* User Management Modal (Admin Only) */}
-      {currentUser && currentUser.is_admin && showUserManagement && (
+      {/* User Management Modal (Available for all users) */}
+      {currentUser && showUserManagement && (
         <div
           className="modal-overlay"
           onClick={() => setShowUserManagement(false)}
@@ -686,8 +686,13 @@ export default function Profile() {
           >
             <div className="card-header-with-toggle" style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-primary)', zIndex: 1, paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
               <div>
-                <h2>👥 User Management</h2>
-                <p className="description">Create and manage user accounts</p>
+                <h2>{currentUser.is_admin ? '👥 User Management' : '👤 Account Settings'}</h2>
+                <p className="description">
+                  {currentUser.is_admin 
+                    ? 'Create and manage user accounts' 
+                    : 'Manage your account settings and data'
+                  }
+                </p>
               </div>
               <button
                 onClick={() => setShowUserManagement(false)}
@@ -768,7 +773,7 @@ export default function Profile() {
           {/* Users List */}
           {users.length > 0 && (
             <div className="users-list">
-              <h3>Existing Users</h3>
+              <h3>{currentUser.is_admin ? 'Existing Users' : 'Your Account'}</h3>
               {users.map((user) => (
                 <div key={user.id} className="user-item">
                   <div className="user-info">
@@ -782,33 +787,71 @@ export default function Profile() {
                     <span className={`user-role ${user.is_admin ? 'admin' : 'user'}`}>
                       {user.is_admin ? 'Admin' : 'User'}
                     </span>
-                    <button
-                      onClick={() => setEditingUser({...user})}
-                      className="btn-icon btn-icon-sm btn-primary"
-                      title="Edit user"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => {
-                        setResetPasswordUser(user);
-                        setNewPassword('');
-                      }}
-                      className="btn-icon btn-icon-sm btn-warning"
-                      title="Reset password"
-                    >
-                      🔑
-                    </button>
-                    {user.id !== currentUser.id && (
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="btn-icon btn-icon-sm btn-danger"
-                        title="Delete user"
-                      >
-                        🗑️
-                      </button>
+                    {currentUser.is_admin ? (
+                      // Admin can edit and reset password for all users
+                      <>
+                        <button
+                          onClick={() => setEditingUser({...user})}
+                          className="btn-icon btn-icon-sm btn-primary"
+                          title="Edit user"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => {
+                            setResetPasswordUser(user);
+                            setNewPassword('');
+                          }}
+                          className="btn-icon btn-icon-sm btn-warning"
+                          title="Reset password"
+                        >
+                          🔑
+                        </button>
+                          {user.id !== currentUser.id && (
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="btn-icon btn-icon-sm btn-danger"
+                              title="Delete user"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                      </>
+                    ) : (
+                      // Regular user can only edit their own info and delete their account
+                      <>
+                        <button
+                          onClick={() => setEditingUser({...user})}
+                          className="btn-icon btn-icon-sm btn-primary"
+                          title="Edit your profile"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => {
+                            setResetPasswordUser(user);
+                            setNewPassword('');
+                          }}
+                          className="btn-icon btn-icon-sm btn-warning"
+                          title="Change password"
+                        >
+                          🔑
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="btn-icon btn-icon-sm btn-danger"
+                          title="Delete your account"
+                          style={{
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: '1px solid #dc3545'
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </>
                     )}
-                  </div>
+                   </div>
                 </div>
               ))}
             </div>
