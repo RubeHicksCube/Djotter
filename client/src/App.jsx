@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 import SettingsDropdown from './components/SettingsDropdown';
+import UserManagementModal from './components/UserManagementModal';
 import { FloatingOtterBottom } from './components/OtterDecorations';
 import logo from './assets/logo.svg';
 
@@ -160,68 +161,11 @@ function AuthenticatedApp() {
         </main>
 
           {/* User Management Modal - Available on All Pages */}
-          {showUserManagement && (
-            <div
-              className="modal-overlay"
-              onClick={handleCloseUserManagement}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 2000,
-                padding: '2rem'
-              }}
-            >
-              <div
-                className="card admin-section"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  maxWidth: '400px',
-                  width: '100%',
-                  padding: '2rem'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3>
-                    {user ? (user.is_admin ? '👥 User Management' : '👤 Account Settings') : 'Loading...'}
-                  </h3>
-                  <button
-                    onClick={handleCloseUserManagement}
-                    className="btn btn-sm btn-ghost"
-                    style={{ fontSize: '1.5rem' }}
-                    title="Close"
-                  >
-                    ✖
-                  </button>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ marginBottom: '1rem' }}>
-                    {user ? (
-                      user.is_admin ? 
-                        'Please go to the Profile page to manage users and create new accounts.' :
-                        'Your account settings and profile management are available on the Profile page.'
-                    ) : 'Loading...'}
-                  </p>
-                  {user && (
-                    <button
-                      onClick={() => {
-                        window.location.href = '/profile';
-                      }}
-                      className="btn btn-primary"
-                    >
-                      Go to Profile
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          <UserManagementModal
+            isOpen={showUserManagement}
+            onClose={handleCloseUserManagement}
+            currentUser={user}
+          />
         </div>
       </UserSettingsProvider>
     );
