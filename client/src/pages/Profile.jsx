@@ -85,8 +85,13 @@ export default function Profile() {
     loadRetentionSettings();
     loadQuickStats();
 
-  // Listen for focus to refresh user data (for admin accounts that create users)
-  window.addEventListener('focus', handleFocus);
+    // Listen for focus to refresh user data (for admin accounts that create users)
+    const handleFocus = () => {
+      loadAvailableDates();
+      loadQuickStats();
+    };
+
+    window.addEventListener('focus', handleFocus);
 
     // Also refresh every 5 seconds to catch saves from nav
     const interval = setInterval(() => {
