@@ -1883,7 +1883,15 @@ app.post('/api/custom-counters/:id/increment', authMiddleware, (req, res) => {
 
   // Get current value and increment
   const currentValue = dataAccess.getCustomCounterValue(id, currentDate);
-  dataAccess.setCustomCounterValue(id, userId, currentDate, currentValue + 1);
+  const newValue = currentValue + 1;
+  dataAccess.setCustomCounterValue(id, userId, currentDate, newValue);
+
+  // Create log entry for counter increment
+  const counterName = db.prepare('SELECT name FROM custom_counters WHERE id = ? AND user_id = ?').get(id, userId);
+  if (counterName) {
+    const logText = `Added 1 to "${counterName.name}" counter (now at ${newValue})`;
+    dataAccess.createActivityEntry(userId, currentDate, logText);
+  }
 
   // Invalidate cache to ensure fresh data is returned
   invalidateUserCache(userId);
@@ -1904,9 +1912,9 @@ app.post('/api/custom-counters/:id/decrement', authMiddleware, (req, res) => {
   
   if (currentValue > 0) {
     dataAccess.setCustomCounterValue(id, userId, currentDate, newValue);
-    
-    // Create log entry for counter increment
-    const logText = `Added 1 to "${counterName.name}" counter (now at ${newValue})`;
+
+    // Create log entry for counter decrement
+    const logText = `Removed 1 from "${counterName.name}" counter (now at ${newValue})`;
     dataAccess.createActivityEntry(userId, currentDate, logText);
   }
 
