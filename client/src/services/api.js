@@ -220,11 +220,11 @@ export const api = {
     return response.json();
   },
 
-  addDailyTask: async (text, dueDate = null, details = null, parentTaskId = null) => {
+  addDailyTask: async (text, dueDate = null, details = null, parentTaskId = null, points = 0) => {
     const response = await fetch(`${API_BASE}/daily-tasks`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ text, dueDate, details, parentTaskId })
+      body: JSON.stringify({ text, dueDate, details, parentTaskId, points })
     });
     return response.json();
   },

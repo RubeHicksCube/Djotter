@@ -1825,6 +1825,7 @@ app.post('/api/trackers/timer/stop/:id', authMiddleware, (req, res) => {
       elapsedMs: newElapsedMs,
       value: newValue,
       isRunning: false,
+      isLocked: true, // Lock timer when stopped
       startTime: null
     });
 
@@ -1843,10 +1844,11 @@ app.post('/api/trackers/timer/reset/:id', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const id = parseInt(req.params.id);
 
-  // Reset tracker in database
+  // Reset tracker in database and unlock it
   dataAccess.updateDurationTracker(id, {
     value: 0,
     isRunning: false,
+    isLocked: false, // Unlock when resetting
     startTime: null,
     elapsedMs: 0
   });
@@ -1988,7 +1990,7 @@ app.delete('/api/daily-custom-fields/:id', authMiddleware, (req, res) => {
 // Daily Tasks
 app.post('/api/daily-tasks', authMiddleware, (req, res) => {
   const userId = req.user.id;
-  const { text, dueDate, details, parentTaskId } = req.body;
+  const { text, dueDate, details, parentTaskId, points } = req.body;
 
   if (!text) {
     return res.status(400).json({ error: 'Task text is required' });
@@ -2003,7 +2005,10 @@ app.post('/api/daily-tasks', authMiddleware, (req, res) => {
     text,
     dueDate || currentDate,
     details,
-    parentTaskId
+    parentTaskId,
+    false, // pinned
+    false, // recurring
+    points || 0
   );
 
   // If details are provided, create a log entry and link it
@@ -2023,7 +2028,7 @@ app.post('/api/daily-tasks', authMiddleware, (req, res) => {
 app.put('/api/daily-tasks/:id', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const id = parseInt(req.params.id);
-  const { text, dueDate, details, pinned, recurring } = req.body;
+  const { text, dueDate, details, pinned, recurring, points } = req.body;
 
   const updates = {};
   if (text !== undefined) updates.text = text;
@@ -2031,6 +2036,7 @@ app.put('/api/daily-tasks/:id', authMiddleware, (req, res) => {
   if (details !== undefined) updates.details = details;
   if (pinned !== undefined) updates.pinned = pinned;
   if (recurring !== undefined) updates.recurring = recurring;
+  if (points !== undefined) updates.points = points;
 
   // Update task in database
   dataAccess.updateDailyTask(id, updates);
@@ -2655,6 +2661,67 @@ app.post('/api/reorder/activity-entries', authMiddleware, (req, res) => {
   } catch (error) {
     console.error('Error reordering activity entries:', error);
     res.status(500).json({ error: 'Failed to reorder items' });
+  }
+});
+
+// ============================================================================
+// POINTS REDEMPTIONS
+// ============================================================================
+
+app.get('/api/points/balance', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const earned = dataAccess.getTotalPointsEarned(userId);
+    const redeemed = dataAccess.getTotalPointsRedeemed(userId);
+    const balance = dataAccess.getPointsBalance(userId);
+
+    res.json({ earned, redeemed, balance });
+  } catch (error) {
+    console.error('Error getting points balance:', error);
+    res.status(500).json({ error: 'Failed to get points balance' });
+  }
+});
+
+app.post('/api/points/redeem', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { rewardDescription, pointsCost } = req.body;
+
+  if (!rewardDescription || !pointsCost || pointsCost <= 0) {
+    return res.status(400).json({ error: 'Invalid redemption data' });
+  }
+
+  try {
+    const balance = dataAccess.getPointsBalance(userId);
+
+    if (balance < pointsCost) {
+      return res.status(400).json({ error: 'Insufficient points' });
+    }
+
+    const redemptionId = dataAccess.createRedemption(userId, rewardDescription, pointsCost);
+    const newBalance = dataAccess.getPointsBalance(userId);
+
+    res.json({
+      success: true,
+      redemptionId,
+      newBalance,
+      message: `Redeemed "${rewardDescription}" for ${pointsCost} points!`
+    });
+  } catch (error) {
+    console.error('Error redeeming points:', error);
+    res.status(500).json({ error: 'Failed to redeem points' });
+  }
+});
+
+app.get('/api/points/redemptions', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const redemptions = dataAccess.getRedemptions(userId);
+    res.json({ redemptions });
+  } catch (error) {
+    console.error('Error getting redemptions:', error);
+    res.status(500).json({ error: 'Failed to get redemptions' });
   }
 });
 

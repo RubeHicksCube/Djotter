@@ -195,6 +195,18 @@ function initializeDatabase() {
     )
   `);
 
+  // Points redemptions
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS points_redemptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      reward_description TEXT NOT NULL,
+      points_cost INTEGER NOT NULL,
+      redeemed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // Add order_index columns for drag-and-drop sorting (migration)
   const addOrderIndexColumn = (tableName) => {
     try {
@@ -450,6 +462,36 @@ function initializeDatabase() {
     }
   };
 
+  // Add is_locked column to duration_trackers (migration)
+  const addDurationTrackerLockColumn = () => {
+    try {
+      const trackerInfo = db.pragma('table_info(duration_trackers)');
+      const hasIsLocked = trackerInfo.some(col => col.name === 'is_locked');
+
+      if (!hasIsLocked) {
+        db.exec('ALTER TABLE duration_trackers ADD COLUMN is_locked INTEGER DEFAULT 0');
+        console.log('✅ Added is_locked column to duration_trackers');
+      }
+    } catch (error) {
+      console.error('Error adding is_locked column to duration_trackers:', error);
+    }
+  };
+
+  // Add points column to daily_tasks (migration)
+  const addTaskPointsColumn = () => {
+    try {
+      const taskInfo = db.pragma('table_info(daily_tasks)');
+      const hasPoints = taskInfo.some(col => col.name === 'points');
+
+      if (!hasPoints) {
+        db.exec('ALTER TABLE daily_tasks ADD COLUMN points INTEGER DEFAULT 0');
+        console.log('✅ Added points column to daily_tasks');
+      }
+    } catch (error) {
+      console.error('Error adding points column to daily_tasks:', error);
+    }
+  };
+
   // Fix user_settings table schema (migration)
   const fixUserSettingsSchema = () => {
     try {
@@ -485,6 +527,8 @@ function initializeDatabase() {
   createQueryIndexes();
   addEnhancedTaskColumns();
   addActivityEntryImageColumn();
+  addDurationTrackerLockColumn();
+  addTaskPointsColumn();
 
   // Fix any users with invalid created_at timestamps
   const usersWithInvalidDates = db.prepare(`

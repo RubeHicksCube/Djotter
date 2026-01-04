@@ -272,9 +272,9 @@ function QueriesDataExport({
       <p className="card-description">Query tasks and fields with analytics, or manage daily snapshots</p>
 
       {/* Calendar Toggle for Snapshots */}
-      {queryType === 'snapshots' && availableDates && availableDates.length > 0 && (
+      {queryType === 'snapshots' && (
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => setShowCalendar(!showCalendar)}
@@ -283,16 +283,31 @@ function QueriesDataExport({
             >
               📅 Calendar {showCalendar ? '▲' : '▼'}
             </button>
-            {showCalendar && (
+            {showCalendar && availableDates && availableDates.length > 0 && (
               <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 {availableDates.length} days with data
               </span>
             )}
+            {showCalendar && (!availableDates || availableDates.length === 0) && (
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                No snapshots saved yet
+              </span>
+            )}
+            {showCalendar && (
+              <span style={{
+                fontSize: '0.75rem',
+                color: 'var(--primary-color)',
+                fontStyle: 'italic',
+                marginLeft: 'auto'
+              }}>
+                💡 Click a date to select it for export
+              </span>
+            )}
           </div>
-          
+
           {/* Expanding Calendar Section */}
           {showCalendar && (
-            <div style={{ 
+            <div style={{
               marginTop: '1rem',
               padding: '1rem',
               backgroundColor: 'var(--bg-secondary)',
@@ -300,8 +315,8 @@ function QueriesDataExport({
               border: '1px solid var(--border-color)',
               transition: 'all 0.3s ease'
             }}>
-              <ContributionCalendar 
-                availableDates={availableDates}
+              <ContributionCalendar
+                availableDates={availableDates || []}
                 formatDateDisplay={formatDateDisplay}
                 compact={true}
                 onDateClick={handleCalendarDateClick}
@@ -474,12 +489,48 @@ function QueriesDataExport({
               💾 Save Today's Snapshot
             </button>
 
+            {/* Selected Date Range Display */}
+            {startDate && endDate && (
+              <div style={{
+                padding: '1rem',
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                border: '2px solid var(--primary-color)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}>📅</span>
+                  <strong>Selected Date Range:</strong>
+                </div>
+                <div style={{ fontSize: '1.1rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>
+                  {startDate === endDate
+                    ? formatDateDisplay(startDate)
+                    : `${formatDateDisplay(startDate)} → ${formatDateDisplay(endDate)}`}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  {startDate === endDate ? 'Single snapshot selected' : `${Math.floor((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1} days selected`}
+                </div>
+              </div>
+            )}
+
             {/* Download Buttons Row */}
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              <button onClick={handleDownloadRange} type="button" className="btn btn-success">
+              <button
+                onClick={handleDownloadRange}
+                type="button"
+                className="btn btn-success"
+                disabled={!startDate || !endDate}
+                style={{ flex: 1, minWidth: '150px' }}
+              >
                 📥 Download Markdown
               </button>
-              <button onClick={handleDownloadRangePDF} type="button" className="btn btn-success">
+              <button
+                onClick={handleDownloadRangePDF}
+                type="button"
+                className="btn btn-success"
+                disabled={!startDate || !endDate}
+                style={{ flex: 1, minWidth: '150px' }}
+              >
                 📄 Download PDF
               </button>
             </div>
@@ -686,7 +737,7 @@ function QueriesDataExport({
           {/* List View */}
           <div className="dates-list" style={{ marginTop: '1rem' }}>
             <h4 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>📋 List View (Last 3)</h4>
-            {availableDates.slice(0, 3).map(date => (
+            {availableDates.slice().reverse().slice(0, 3).map(date => (
               <div key={date} className="date-item">
                 <span className="date-badge">📅 {formatDateDisplay(date)}</span>
                 <div className="date-actions">
@@ -766,7 +817,7 @@ function QueriesDataExport({
               overflowY: 'auto', // Allow scrolling if content is tall
               padding: '1.5rem' // More padding for better spacing
             }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div style={{

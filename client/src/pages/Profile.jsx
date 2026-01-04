@@ -42,6 +42,9 @@ export default function Profile() {
     totalTimeSince: 0,
     totalCounters: 0,
     totalLogEntries: 0,
+    pointsBalance: 0,
+    pointsEarned: 0,
+    pointsRedeemed: 0,
     totalSnapshots: 0,
     totalFields: 0,
     lastLogin: null
@@ -56,6 +59,10 @@ export default function Profile() {
   // Retention settings
   const [retentionSettings, setRetentionSettings] = useState({ maxDays: 30, maxCount: 100 });
 
+  // Redemption modal state
+  const [showRedemptionModal, setShowRedemptionModal] = useState(false);
+  const [rewardDescription, setRewardDescription] = useState('');
+  const [pointsCost, setPointsCost] = useState(0);
 
   // Form states
   const [editForm, setEditForm] = useState({
@@ -365,12 +372,30 @@ export default function Profile() {
       // Get current state with all data
       const state = await api.getState();
 
+      // Get points balance
+      let pointsData = { balance: 0, earned: 0, redeemed: 0 };
+      try {
+        const response = await fetch('/api/points/balance', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          }
+        });
+        if (response.ok) {
+          pointsData = await response.json();
+        }
+      } catch (error) {
+        console.error('Error loading points:', error);
+      }
+
       setQuickStats({
         totalTasks: state?.dailyTasks?.length || 0,
         totalTimers: state?.durationTrackers?.length || 0,
         totalTimeSince: state?.timeSinceTrackers?.length || 0,
         totalCounters: state?.customCounters?.length || 0,
         totalLogEntries: state?.entries?.length || 0,
+        pointsBalance: pointsData.balance || 0,
+        pointsEarned: pointsData.earned || 0,
+        pointsRedeemed: pointsData.redeemed || 0,
         totalSnapshots: availableDates.length,
         totalFields: state?.customFields?.length || 0,
         lastLogin: currentUser?.created_at
@@ -452,6 +477,44 @@ export default function Profile() {
 
     api.downloadDateRangePDF(startDate, endDate);
     setMessage(`Downloading PDF export from ${startDate} to ${endDate}...`);
+  };
+
+  const handleRedeemPoints = async () => {
+    if (!rewardDescription.trim() || pointsCost <= 0) {
+      setMessage('Please enter a valid reward and points cost');
+      return;
+    }
+
+    if (pointsCost > quickStats.pointsBalance) {
+      setMessage('Insufficient points');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/points/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({ rewardDescription, pointsCost })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(data.message);
+        setShowRedemptionModal(false);
+        setRewardDescription('');
+        setPointsCost(0);
+        loadQuickStats(); // Refresh points balance
+      } else {
+        setMessage(data.error || 'Failed to redeem points');
+      }
+    } catch (error) {
+      console.error('Error redeeming points:', error);
+      setMessage('Error redeeming points');
+    }
   };
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -642,6 +705,31 @@ export default function Profile() {
                 {quickStats.lastLogin ? formatDateDisplay(quickStats.lastLogin) : 'N/A'}
               </span>
             </div>
+
+            {/* Points Section */}
+            <div style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, var(--primary-color), var(--success-color))',
+              border: '2px solid var(--primary-color)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '1rem', color: 'white', fontWeight: 'bold' }}>⭐ Total Points</span>
+                <span style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'white' }}>{quickStats.pointsBalance}</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.9)', marginBottom: '0.75rem' }}>
+                Earned: {quickStats.pointsEarned} | Redeemed: {quickStats.pointsRedeemed}
+              </div>
+              <button
+                onClick={() => setShowRedemptionModal(true)}
+                className="btn btn-warning"
+                style={{ width: '100%', fontWeight: 'bold' }}
+                disabled={quickStats.pointsBalance === 0}
+              >
+                🎁 Redeem Points
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -658,12 +746,15 @@ export default function Profile() {
             handleDeleteSnapshot={handleDeleteSnapshot}
             retentionSettings={retentionSettings}
             setRetentionSettings={setRetentionSettings}
+            handleUpdateRetentionSettings={handleUpdateRetentionSettings}
             startDate={startDate}
-              setEndDate={setEndDate}
-              handleDownloadRange={handleDownloadRange}
-              handleDownloadRangePDF={handleDownloadRangePDF}
-              formatDateDisplay={formatDateDisplay}
-            />
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            handleDownloadRange={handleDownloadRange}
+            handleDownloadRangePDF={handleDownloadRangePDF}
+            formatDateDisplay={formatDateDisplay}
+          />
           </div>
 
       {/* User Management Modal (Available for all users) */}
@@ -939,6 +1030,87 @@ export default function Profile() {
           )}
             </>
             )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Points Redemption Modal */}
+      {showRedemptionModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowRedemptionModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2001,
+            padding: '2rem'
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '500px',
+              width: '100%',
+              padding: '2rem'
+            }}
+          >
+            <h2 style={{ marginBottom: '1rem' }}>🎁 Redeem Points</h2>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
+              Available Points: <strong style={{ color: 'var(--primary-color)', fontSize: '1.25rem' }}>{quickStats.pointsBalance}</strong>
+            </p>
+
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label className="form-label">Reward Description</label>
+              <input
+                type="text"
+                value={rewardDescription}
+                onChange={(e) => setRewardDescription(e.target.value)}
+                className="form-input"
+                placeholder="e.g., Movie night, Ice cream, New book"
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label className="form-label">Points Cost</label>
+              <input
+                type="number"
+                value={pointsCost}
+                onChange={(e) => setPointsCost(parseInt(e.target.value) || 0)}
+                className="form-input"
+                placeholder="How many points?"
+                min="1"
+                max={quickStats.pointsBalance}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowRedemptionModal(false);
+                  setRewardDescription('');
+                  setPointsCost(0);
+                }}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRedeemPoints}
+                className="btn btn-success"
+                disabled={!rewardDescription.trim() || pointsCost <= 0 || pointsCost > quickStats.pointsBalance}
+              >
+                Redeem {pointsCost > 0 ? `${pointsCost} Points` : ''}
+              </button>
             </div>
           </div>
         </div>

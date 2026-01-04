@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useUserSettings } from '../contexts/UserSettingsContext';
+import { useCurrentDate } from '../contexts/CurrentDateContext';
 import { formatLogTime } from '../utils/timezone';
 import { PeekingOtterTop, PeekingOtterSide } from '../components/OtterDecorations';
 import ContributionCalendar from '../components/ContributionCalendar';
@@ -74,6 +75,7 @@ function SortableItem({ id, children }) {
 
 export default function Home() {
   const { settings } = useUserSettings();
+  const { setCurrentDate, isViewingHistoricalDate, setIsViewingHistoricalDate, resetToToday } = useCurrentDate();
   const [state, setState] = useState(null);
   const [entryText, setEntryText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -82,7 +84,7 @@ export default function Home() {
   // Template custom field form (persist name, reset value daily)
   const [templateFieldKey, setTemplateFieldKey] = useState('');
   const [templateFieldType, setTemplateFieldType] = useState('text');
-  
+
 
 
   // Daily custom field form (non-persistent)
@@ -95,6 +97,7 @@ export default function Home() {
   // Daily task form
   const [dailyTaskText, setDailyTaskText] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskPoints, setTaskPoints] = useState(0);
   const [availableDates, setAvailableDates] = useState([]);
   const [taskDetails, setTaskDetails] = useState('');
   const [showTaskOptions, setShowTaskOptions] = useState(false);
@@ -119,9 +122,6 @@ export default function Home() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
 
-  // Historical date navigation
-  const [isViewingHistoricalDate, setIsViewingHistoricalDate] = useState(false);
-
   // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -135,13 +135,40 @@ export default function Home() {
     loadAllTasks();
     loadAvailableDates();
 
-    // Update time every second
+    // Update time every second and check for date changes
     const timeInterval = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-    
+
     return () => clearInterval(timeInterval);
   }, []);
+
+  // Auto-save snapshot when date changes or app loads
+  useEffect(() => {
+    const autoSaveSnapshot = async () => {
+      if (!state?.date) return;
+
+      try {
+        // Check if we already have a snapshot for today
+        const dates = availableDates || [];
+        const hasSnapshotForToday = dates.includes(state.date);
+
+        // Save snapshot if it doesn't exist for today
+        if (!hasSnapshotForToday) {
+          console.log('Auto-saving snapshot for', state.date);
+          await api.saveSnapshot();
+          loadAvailableDates(); // Refresh available dates
+        }
+      } catch (error) {
+        console.error('Error auto-saving snapshot:', error);
+      }
+    };
+
+    // Run auto-save when state loads or date changes
+    if (state?.date && !isViewingHistoricalDate) {
+      autoSaveSnapshot();
+    }
+  }, [state?.date, isViewingHistoricalDate]);
 
   // Reload state when timezone changes to get updated date
   useEffect(() => {
@@ -219,6 +246,7 @@ export default function Home() {
       const data = await api.getStateForDate(date);
       setState(data);
       setIsViewingHistoricalDate(true);
+      setCurrentDate(date); // Update context
       setLoading(false);
     } catch (error) {
       console.error('Error loading historical state:', error);
@@ -228,6 +256,7 @@ export default function Home() {
 
   const handleGoToToday = () => {
     setIsViewingHistoricalDate(false);
+    resetToToday(); // Reset context
     loadState();
   };
 
@@ -444,13 +473,15 @@ export default function Home() {
         dailyTaskText,
         taskDueDate || currentDate,
         taskDetails,
-        null // parentTaskId
+        null, // parentTaskId
+        taskPoints || 0
       );
       setState(data);
       await loadAllTasks();
       setDailyTaskText('');
       setTaskDueDate('');
       setTaskDetails('');
+      setTaskPoints(0);
       setShowTaskOptions(false);
     } catch (error) {
       console.error('Error adding daily task:', error);
@@ -680,15 +711,27 @@ export default function Home() {
           searchDate: queryDate
         });
       } else {
-        // Date-only search - get full snapshot
-        const result = await api.getSnapshot(queryDate);
-        const snapshot = result.snapshot;
-        setHistoricalLog({
-          ...snapshot,
-          entries: snapshot.entries || [],
-          date: queryDate,
-          searchMode: 'snapshot'
-        });
+        // Date-only search - try snapshot first, fallback to database state
+        try {
+          const result = await api.getSnapshot(queryDate);
+          const snapshot = result.snapshot;
+          setHistoricalLog({
+            ...snapshot,
+            entries: snapshot.entries || [],
+            date: queryDate,
+            searchMode: 'snapshot'
+          });
+        } catch (snapshotError) {
+          // Snapshot not found, load from database instead
+          console.log('No snapshot found, loading from database...', snapshotError);
+          const result = await api.getStateForDate(queryDate);
+          setHistoricalLog({
+            ...result,
+            entries: result.entries || [],
+            date: queryDate,
+            searchMode: 'database'
+          });
+        }
       }
     } catch (error) {
       console.error('Error querying history:', error);
@@ -788,44 +831,47 @@ export default function Home() {
           <p className="card-description">Search logs by text or view snapshots by date</p>
           
           {/* Calendar Toggle */}
-          {availableDates && availableDates.length > 0 && (
-            <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCalendar(!showCalendar)}
-                  className={`btn btn-sm ${showCalendar ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                >
-                  📅 Calendar {showCalendar ? '▲' : '▼'}
-                </button>
-                {showCalendar && (
-                  <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                    {availableDates.length} days with data
-                  </span>
-                )}
-              </div>
-              
-              {/* Expanding Calendar Section */}
-              {showCalendar && (
-                <div style={{ 
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <ContributionCalendar 
-                    availableDates={availableDates}
-                    formatDateDisplay={formatDate}
-                    compact={true}
-                    onDateClick={handleCalendarDateClick}
-                  />
-                </div>
+          <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowCalendar(!showCalendar)}
+                className={`btn btn-sm ${showCalendar ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                📅 Calendar {showCalendar ? '▲' : '▼'}
+              </button>
+              {showCalendar && availableDates && availableDates.length > 0 && (
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  {availableDates.length} days with data
+                </span>
+              )}
+              {showCalendar && (!availableDates || availableDates.length === 0) && (
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  No snapshots saved yet
+                </span>
               )}
             </div>
-          )}
+
+            {/* Expanding Calendar Section */}
+            {showCalendar && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                transition: 'all 0.3s ease'
+              }}>
+                <ContributionCalendar
+                  availableDates={availableDates || []}
+                  formatDateDisplay={formatDate}
+                  compact={true}
+                  onDateClick={handleCalendarDateClick}
+                />
+              </div>
+            )}
+          </div>
 
           <form onSubmit={handleQueryHistory}>
             <div className="form-row">
@@ -1161,7 +1207,7 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                   <label className="form-label">Due Date</label>
                   <input
                     type="date"
@@ -1169,6 +1215,22 @@ export default function Home() {
                     onChange={(e) => setTaskDueDate(e.target.value)}
                     className="form-input"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Points (optional)</label>
+                  <input
+                    type="number"
+                    value={taskPoints}
+                    onChange={(e) => setTaskPoints(parseInt(e.target.value) || 0)}
+                    className="form-input"
+                    placeholder="0"
+                    min="0"
+                    step="1"
+                  />
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Assign points to track task value
+                  </small>
                 </div>
               </div>
             )}
@@ -1258,6 +1320,20 @@ export default function Home() {
                                   className="form-input"
                                   style={{ marginBottom: '0.5rem' }}
                                 />
+                                <input
+                                  type="number"
+                                  value={task.points || 0}
+                                  onChange={(e) => setAllTasks(prev =>
+                                    prev.map(t =>
+                                      t.id === task.id ? { ...t, points: parseInt(e.target.value) || 0 } : t
+                                    )
+                                  )}
+                                  className="form-input"
+                                  placeholder="Points"
+                                  min="0"
+                                  step="1"
+                                  style={{ marginBottom: '0.5rem' }}
+                                />
                               </div>
                             ) : (
                               <div>
@@ -1278,6 +1354,11 @@ export default function Home() {
                                 {task.dueDate && (
                                   <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
                                     📅 {formatDate(task.dueDate)}
+                                  </span>
+                                )}
+                                {task.points > 0 && (
+                                  <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>
+                                    ⭐ {task.points} pts
                                   </span>
                                 )}
                                  {task.logEntryId && (

@@ -188,11 +188,12 @@ function deleteTimeSinceTracker(id) {
 
 function getDurationTrackers(userId) {
   return db.prepare(`
-    SELECT id, name, type, is_running, start_time, elapsed_ms, value, order_index
+    SELECT id, name, type, is_running, is_locked, start_time, elapsed_ms, value, order_index
     FROM duration_trackers WHERE user_id = ? ORDER BY order_index
   `).all(userId).map(row => ({
     ...row,
     isRunning: Boolean(row.is_running),
+    isLocked: Boolean(row.is_locked),
     startTime: row.start_time,
     elapsedMs: row.elapsed_ms
   }));
@@ -213,6 +214,10 @@ function updateDurationTracker(id, updates) {
   if (updates.isRunning !== undefined) {
     fields.push('is_running = ?');
     values.push(updates.isRunning ? 1 : 0);
+  }
+  if (updates.isLocked !== undefined) {
+    fields.push('is_locked = ?');
+    values.push(updates.isLocked ? 1 : 0);
   }
   if (updates.startTime !== undefined) {
     fields.push('start_time = ?');
@@ -367,6 +372,7 @@ function getDailyTasks(userId, date) {
       done: Boolean(subRow.done),
       dueDate: subRow.due_date,
       details: subRow.details,
+      points: subRow.points || 0,
       pinned: Boolean(subRow.pinned),
       recurring: Boolean(subRow.recurring),
       completedAt: subRow.completed_at,
@@ -380,6 +386,7 @@ function getDailyTasks(userId, date) {
       done: Boolean(row.done),
       dueDate: row.due_date,
       details: row.details,
+      points: row.points || 0,
       logEntryId: row.log_entry_id,
       pinned: Boolean(row.pinned),
       recurring: Boolean(row.recurring),
@@ -391,14 +398,14 @@ function getDailyTasks(userId, date) {
   });
 }
 
-function createDailyTask(userId, date, text, dueDate = null, details = null, parentTaskId = null, pinned = false, recurring = false) {
+function createDailyTask(userId, date, text, dueDate = null, details = null, parentTaskId = null, pinned = false, recurring = false, points = 0) {
   const maxOrder = parentTaskId
     ? db.prepare('SELECT COALESCE(MAX(order_index), -1) as max FROM daily_tasks WHERE parent_task_id = ?').get(parentTaskId)
     : db.prepare('SELECT COALESCE(MAX(order_index), -1) as max FROM daily_tasks WHERE user_id = ? AND date = ? AND parent_task_id IS NULL').get(userId, date);
 
   const result = db.prepare(
-    'INSERT INTO daily_tasks (user_id, date, text, due_date, details, parent_task_id, pinned, recurring, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(userId, date, text, dueDate || date, details, parentTaskId, pinned ? 1 : 0, recurring ? 1 : 0, maxOrder.max + 1);
+    'INSERT INTO daily_tasks (user_id, date, text, due_date, details, parent_task_id, pinned, recurring, points, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(userId, date, text, dueDate || date, details, parentTaskId, pinned ? 1 : 0, recurring ? 1 : 0, points || 0, maxOrder.max + 1);
   return result.lastInsertRowid;
 }
 
@@ -429,6 +436,10 @@ function updateDailyTask(id, updates) {
   if (updates.recurring !== undefined) {
     fields.push('recurring = ?');
     values.push(updates.recurring ? 1 : 0);
+  }
+  if (updates.points !== undefined) {
+    fields.push('points = ?');
+    values.push(updates.points || 0);
   }
 
   if (fields.length === 0) return;
@@ -804,6 +815,50 @@ function calculateFieldSummary(data) {
   return summary;
 }
 
+// ============================================================================
+// POINTS REDEMPTIONS
+// ============================================================================
+
+function getTotalPointsEarned(userId) {
+  const result = db.prepare(`
+    SELECT COALESCE(SUM(points), 0) as total
+    FROM daily_tasks
+    WHERE user_id = ? AND done = 1 AND points > 0
+  `).get(userId);
+  return result.total || 0;
+}
+
+function getTotalPointsRedeemed(userId) {
+  const result = db.prepare(`
+    SELECT COALESCE(SUM(points_cost), 0) as total
+    FROM points_redemptions
+    WHERE user_id = ?
+  `).get(userId);
+  return result.total || 0;
+}
+
+function getPointsBalance(userId) {
+  const earned = getTotalPointsEarned(userId);
+  const redeemed = getTotalPointsRedeemed(userId);
+  return earned - redeemed;
+}
+
+function createRedemption(userId, rewardDescription, pointsCost) {
+  const result = db.prepare(
+    'INSERT INTO points_redemptions (user_id, reward_description, points_cost) VALUES (?, ?, ?)'
+  ).run(userId, rewardDescription, pointsCost);
+  return result.lastInsertRowid;
+}
+
+function getRedemptions(userId) {
+  return db.prepare(`
+    SELECT id, reward_description, points_cost, redeemed_at
+    FROM points_redemptions
+    WHERE user_id = ?
+    ORDER BY redeemed_at DESC
+  `).all(userId);
+}
+
 module.exports = {
   // Users
   getAllUsers,
@@ -888,5 +943,12 @@ module.exports = {
   calculateFieldSummary,
 
   // Custom field templates
-  updateCustomFieldTemplate
+  updateCustomFieldTemplate,
+
+  // Points Redemptions
+  getTotalPointsEarned,
+  getTotalPointsRedeemed,
+  getPointsBalance,
+  createRedemption,
+  getRedemptions
 };

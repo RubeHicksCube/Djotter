@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { api } from './services/api';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
+import { CurrentDateProvider, useCurrentDate } from './contexts/CurrentDateContext';
 import Home from './pages/Home';
 import Trackers from './pages/Trackers';
 import LoginPage from './pages/LoginPage';
@@ -12,7 +13,8 @@ import UserManagementModal from './components/UserManagementModal';
 import { FloatingOtterBottom } from './components/OtterDecorations';
 import logo from './assets/logo.svg';
 
-function AuthenticatedApp() {
+function AuthenticatedAppContent() {
+  const { currentDate, isViewingHistoricalDate } = useCurrentDate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -74,11 +76,23 @@ function AuthenticatedApp() {
   };
 
   const handleDownloadToday = () => {
-    api.downloadMarkdown();
+    if (currentDate && isViewingHistoricalDate) {
+      // Export the currently viewed date
+      api.downloadDateRange(currentDate, currentDate);
+    } else {
+      // Export today
+      api.downloadMarkdown();
+    }
   };
 
   const handleDownloadPDF = () => {
-    api.downloadPDF();
+    if (currentDate && isViewingHistoricalDate) {
+      // Export the currently viewed date as PDF
+      api.downloadDateRangePDF(currentDate, currentDate);
+    } else {
+      // Export today as PDF
+      api.downloadPDF();
+    }
   };
 
   const handleSaveSnapshot = async () => {
@@ -96,10 +110,9 @@ function AuthenticatedApp() {
   }
 
   return (
-    <UserSettingsProvider>
-      <div className="app">
-        <FloatingOtterBottom />
-        <nav className="nav">
+    <div className="app">
+      <FloatingOtterBottom />
+      <nav className="nav">
           <div className="nav-container">
             <NavLink to="/" className="nav-brand">
               <img src={logo} alt="Djotter" style={{ width: '24px', height: '24px', marginRight: '8px', verticalAlign: 'middle' }} />
@@ -167,6 +180,15 @@ function AuthenticatedApp() {
           currentUser={user}
         />
       </div>
+  );
+}
+
+function AuthenticatedApp() {
+  return (
+    <UserSettingsProvider>
+      <CurrentDateProvider>
+        <AuthenticatedAppContent />
+      </CurrentDateProvider>
     </UserSettingsProvider>
   );
 }
