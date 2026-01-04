@@ -1257,13 +1257,18 @@ export default function Home() {
                  <div className="tasks-list">
                    {allTasks.map((task) => (
                      <SortableItem key={task.id} id={task.id}>
-                       <div style={{ 
-                         marginBottom: '0.75rem', 
-                         border: '1px solid var(--border-color)', 
-                         borderRadius: 'var(--radius-md)', 
-                         padding: '0.75rem', 
-                         backgroundColor: task.pinned ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
-                         borderLeft: task.pinned ? '3px solid var(--primary-color)' : '1px solid var(--border-color)'
+                       <div style={{
+                         marginBottom: '0.75rem',
+                         border: '1px solid var(--border-color)',
+                         borderRadius: 'var(--radius-md)',
+                         padding: '0.75rem',
+                         backgroundColor: task.isReward
+                           ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(34, 197, 94, 0.15))'
+                           : task.pinned ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                         borderLeft: task.isReward
+                           ? '4px solid gold'
+                           : task.pinned ? '3px solid var(--primary-color)' : '1px solid var(--border-color)',
+                         boxShadow: task.isReward ? '0 2px 8px rgba(255, 215, 0, 0.3)' : 'none'
                        }}>
                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                            {task.pinned && (

@@ -492,6 +492,36 @@ function initializeDatabase() {
     }
   };
 
+  // Add is_reward column to daily_tasks (migration)
+  const addTaskIsRewardColumn = () => {
+    try {
+      const taskInfo = db.pragma('table_info(daily_tasks)');
+      const hasIsReward = taskInfo.some(col => col.name === 'is_reward');
+
+      if (!hasIsReward) {
+        db.exec('ALTER TABLE daily_tasks ADD COLUMN is_reward INTEGER DEFAULT 0');
+        console.log('✅ Added is_reward column to daily_tasks');
+      }
+    } catch (error) {
+      console.error('Error adding is_reward column to daily_tasks:', error);
+    }
+  };
+
+  // Add redemption_id to daily_tasks (migration)
+  const addTaskRedemptionIdColumn = () => {
+    try {
+      const taskInfo = db.pragma('table_info(daily_tasks)');
+      const hasRedemptionId = taskInfo.some(col => col.name === 'redemption_id');
+
+      if (!hasRedemptionId) {
+        db.exec('ALTER TABLE daily_tasks ADD COLUMN redemption_id INTEGER REFERENCES points_redemptions(id) ON DELETE SET NULL');
+        console.log('✅ Added redemption_id column to daily_tasks');
+      }
+    } catch (error) {
+      console.error('Error adding redemption_id column to daily_tasks:', error);
+    }
+  };
+
   // Fix user_settings table schema (migration)
   const fixUserSettingsSchema = () => {
     try {
@@ -529,6 +559,8 @@ function initializeDatabase() {
   addActivityEntryImageColumn();
   addDurationTrackerLockColumn();
   addTaskPointsColumn();
+  addTaskIsRewardColumn();
+  addTaskRedemptionIdColumn();
 
   // Fix any users with invalid created_at timestamps
   const usersWithInvalidDates = db.prepare(`

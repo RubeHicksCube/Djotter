@@ -63,6 +63,8 @@ export default function Profile() {
   const [showRedemptionModal, setShowRedemptionModal] = useState(false);
   const [rewardDescription, setRewardDescription] = useState('');
   const [pointsCost, setPointsCost] = useState(0);
+  const [redemptionsHistory, setRedemptionsHistory] = useState([]);
+  const [showRedemptionHistory, setShowRedemptionHistory] = useState(false);
 
   // Form states
   const [editForm, setEditForm] = useState({
@@ -91,6 +93,7 @@ export default function Profile() {
     loadAvailableDates();
     loadRetentionSettings();
     loadQuickStats();
+    loadRedemptionHistory();
 
     // Listen for custom event to open User Management modal
     const handleOpenUserManagement = () => {
@@ -405,6 +408,48 @@ export default function Profile() {
     }
   };
 
+  const loadRedemptionHistory = async () => {
+    try {
+      const response = await fetch('/api/points/redemptions', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRedemptionsHistory(data.redemptions || []);
+      }
+    } catch (error) {
+      console.error('Error loading redemption history:', error);
+    }
+  };
+
+  const handleCancelRedemption = async (redemptionId) => {
+    if (!confirm('Cancel this redemption? Points will be refunded.')) return;
+
+    try {
+      const response = await fetch(`/api/points/redemptions/${redemptionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(data.message || 'Redemption cancelled successfully');
+        loadRedemptionHistory();
+        loadQuickStats();
+      } else {
+        setMessage(data.error || 'Failed to cancel redemption');
+      }
+    } catch (error) {
+      console.error('Error cancelling redemption:', error);
+      setMessage('Failed to cancel redemption');
+    }
+  };
+
   const handleDeleteSnapshot = async (date) => {
     if (!confirm(`Delete snapshot for ${date}? This cannot be undone.`)) return;
 
@@ -508,6 +553,7 @@ export default function Profile() {
         setRewardDescription('');
         setPointsCost(0);
         loadQuickStats(); // Refresh points balance
+        loadRedemptionHistory(); // Refresh redemption list
       } else {
         setMessage(data.error || 'Failed to redeem points');
       }
@@ -729,7 +775,57 @@ export default function Profile() {
               >
                 🎁 Redeem Points
               </button>
+              <button
+                onClick={() => setShowRedemptionHistory(!showRedemptionHistory)}
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.875rem' }}
+              >
+                📜 {showRedemptionHistory ? 'Hide' : 'View'} Redemption History ({redemptionsHistory.length})
+              </button>
             </div>
+
+            {/* Redemption History */}
+            {showRedemptionHistory && redemptionsHistory.length > 0 && (
+              <div style={{ marginTop: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
+                {redemptionsHistory.map((redemption) => (
+                  <div
+                    key={redemption.id}
+                    style={{
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                        {redemption.reward_description}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                        {new Date(redemption.redeemed_at).toLocaleDateString()} • {redemption.points_cost} points
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleCancelRedemption(redemption.id)}
+                      className="btn btn-sm btn-danger"
+                      style={{ marginLeft: '0.5rem' }}
+                    >
+                      Cancel & Refund
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showRedemptionHistory && redemptionsHistory.length === 0 && (
+              <div style={{ marginTop: '1rem', padding: '1rem', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                No redemptions yet
+              </div>
+            )}
           </div>
         </div>
       </div>

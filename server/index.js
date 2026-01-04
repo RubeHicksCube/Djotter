@@ -2073,11 +2073,22 @@ app.put('/api/daily-tasks/:id/toggle', authMiddleware, (req, res) => {
     const currentDate = getCurrentDateInUserTimezone(userId);
     const completedDate = task.completedAt ? task.completedAt.slice(0, 10) : currentDate;
 
-    let logText = `Completed a Task: ${task.text}`;
-    if (task.due_date) {
-      logText += `\nDue: ${task.due_date}`;
+    let logText;
+    if (task.is_reward) {
+      // Special message for reward tickets
+      logText = `🎁 Reward Used: ${task.text.replace('🎁 ', '')}`;
+      if (task.details) {
+        logText += `\n${task.details}`;
+      }
+      logText += `\nUsed: ${completedDate}`;
+    } else {
+      // Regular task completion message
+      logText = `Completed a Task: ${task.text}`;
+      if (task.due_date) {
+        logText += `\nDue: ${task.due_date}`;
+      }
+      logText += `\nCompleted: ${completedDate}`;
     }
-    logText += `\nCompleted: ${completedDate}`;
 
     dataAccess.createActivityEntry(userId, currentDate, logText);
   }
@@ -2701,9 +2712,26 @@ app.post('/api/points/redeem', authMiddleware, (req, res) => {
     const redemptionId = dataAccess.createRedemption(userId, rewardDescription, pointsCost);
     const newBalance = dataAccess.getPointsBalance(userId);
 
+    // Create a reward ticket task for today
+    const today = new Date().toISOString().split('T')[0];
+    const taskId = dataAccess.createDailyTask(
+      userId,
+      today,
+      `🎁 ${rewardDescription}`,
+      today,
+      `Redeemed for ${pointsCost} points`,
+      null,
+      false,
+      false,
+      0,
+      true, // isReward = true
+      redemptionId // link to redemption
+    );
+
     res.json({
       success: true,
       redemptionId,
+      taskId,
       newBalance,
       message: `Redeemed "${rewardDescription}" for ${pointsCost} points!`
     });
@@ -2722,6 +2750,34 @@ app.get('/api/points/redemptions', authMiddleware, (req, res) => {
   } catch (error) {
     console.error('Error getting redemptions:', error);
     res.status(500).json({ error: 'Failed to get redemptions' });
+  }
+});
+
+app.delete('/api/points/redemptions/:id', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const redemptionId = parseInt(req.params.id);
+
+  if (!redemptionId || isNaN(redemptionId)) {
+    return res.status(400).json({ error: 'Invalid redemption ID' });
+  }
+
+  try {
+    const deleted = dataAccess.deleteRedemption(redemptionId, userId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Redemption not found' });
+    }
+
+    const newBalance = dataAccess.getPointsBalance(userId);
+
+    res.json({
+      success: true,
+      newBalance,
+      message: 'Redemption cancelled and points refunded'
+    });
+  } catch (error) {
+    console.error('Error deleting redemption:', error);
+    res.status(500).json({ error: error.message || 'Failed to cancel redemption' });
   }
 });
 
