@@ -1830,7 +1830,9 @@ app.post('/api/trackers/timer/stop/:id', authMiddleware, (req, res) => {
     });
 
     // Create log entry for timer stop
-    const completedTime = format(new Date(), 'HH:mm:ss');
+    const settings = dataAccess.getUserSettings(userId);
+    const timezone = settings?.timezone || 'UTC';
+    const completedTime = formatInTimeZone(new Date(), timezone, 'HH:mm:ss');
     const logText = `Stopped "${tracker.name}" timer (elapsed: ${newValue}s, completed at: ${completedTime})`;
     const currentDate = getCurrentDateInUserTimezone(userId);
     dataAccess.createActivityEntry(userId, currentDate, logText);
