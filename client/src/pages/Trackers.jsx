@@ -95,7 +95,8 @@ export default function Trackers() {
     loadState();
     // Set default date for time since picker
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+    const timezone = settings?.timezone || 'UTC';
+    const dateStr = formatInTimeZone(now, timezone, "yyyy-MM-dd'T'HH:mm"); // YYYY-MM-DDTHH:MM
     setTimeSinceDate(dateStr);
     
     // Update time every second

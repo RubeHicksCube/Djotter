@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useUserSettings } from '../contexts/UserSettingsContext';
 import { useCurrentDate } from '../contexts/CurrentDateContext';
-import { formatLogTime } from '../utils/timezone';
+import { formatLogTime, getTodayInUserTimezone } from '../utils/timezone';
 import { PeekingOtterTop, PeekingOtterSide } from '../components/OtterDecorations';
 import ContributionCalendar from '../components/ContributionCalendar';
 import {
@@ -264,7 +264,7 @@ export default function Home() {
     if (!queryDate) return;
 
     // Check if selected date is today
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayInUserTimezone(settings?.timezone || 'UTC');
     if (queryDate === today) {
       handleGoToToday();
       return;
@@ -468,7 +468,7 @@ export default function Home() {
     if (!dailyTaskText.trim()) return;
 
     try {
-      const currentDate = new Date().toISOString().slice(0, 10);
+      const currentDate = getTodayInUserTimezone(settings?.timezone || 'UTC');
       const data = await api.addDailyTask(
         dailyTaskText,
         taskDueDate || currentDate,
@@ -502,7 +502,7 @@ export default function Home() {
       let tasks = response.tasks || [];
 
       // Filter out completed tasks that were completed before today
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getTodayInUserTimezone(settings?.timezone || 'UTC');
       tasks = tasks.filter(task => {
         if (!task.done) return true; // Keep all incomplete tasks
         if (!task.completedAt) return true; // Keep if no completion date
@@ -533,7 +533,7 @@ export default function Home() {
     if (!subTaskText.trim()) return;
 
     try {
-      const currentDate = new Date().toISOString().slice(0, 10);
+      const currentDate = getTodayInUserTimezone(settings?.timezone || 'UTC');
       const data = await api.addDailyTask(
         subTaskText,
         currentDate,

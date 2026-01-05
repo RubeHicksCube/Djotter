@@ -24,6 +24,7 @@ const formatDateDisplay = (dateStr) => {
 };
 
 export default function Profile() {
+  const { settings } = useUserSettings();
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [profileFields, setProfileFields] = useState({});
@@ -806,7 +807,7 @@ export default function Profile() {
                         {redemption.reward_description}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                        {new Date(redemption.redeemed_at).toLocaleDateString()} • {redemption.points_cost} points
+                        {formatInTimeZone(new Date(redemption.redeemed_at), settings?.timezone || 'UTC', 'MMM dd, yyyy HH:mm')} • {redemption.points_cost} points
                       </div>
                     </div>
                     <button

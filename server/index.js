@@ -484,6 +484,18 @@ function formatDuration(seconds) {
   return parts.join(' ');
 }
 
+// Helper function to format elapsed time as HH:MM:SS or MM:SS (matches UI display)
+function formatElapsedTime(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 // Get current elapsed time for running timer
 function getCurrentElapsedTime(tracker) {
   if (tracker.type !== 'timer') return tracker.value;
@@ -1598,7 +1610,10 @@ app.post('/api/exports/download-zip', async (req, res) => {
         // PDF generation (same as single PDF export)
         doc.fontSize(24).text(`Daily Journal - ${date}`, { align: 'center' });
         doc.moveDown();
-        doc.fontSize(10).text(`Generated on ${new Date().toLocaleDateString()}`, { align: 'center' });
+        const settings = dataAccess.getUserSettings(userId);
+        const timezone = settings?.timezone || 'UTC';
+        const generatedDate = formatInTimeZone(new Date(), timezone, 'MMM dd, yyyy HH:mm');
+        doc.fontSize(10).text(`Generated on ${generatedDate}`, { align: 'center' });
         doc.moveDown(2);
 
         // Profile Fields
@@ -1655,7 +1670,7 @@ app.post('/api/exports/download-zip', async (req, res) => {
           doc.moveDown(0.5);
           doc.fontSize(12).fillColor('#000000');
           snapshot.entries.forEach(entry => {
-            const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '';
+            const time = entry.timestamp ? formatInTimeZone(new Date(entry.timestamp), timezone, 'HH:mm:ss') : '';
             doc.text(`[${time}] ${entry.text}`, { indent: 20 });
           });
           doc.moveDown();
@@ -1833,7 +1848,8 @@ app.post('/api/trackers/timer/stop/:id', authMiddleware, (req, res) => {
     const settings = dataAccess.getUserSettings(userId);
     const timezone = settings?.timezone || 'UTC';
     const completedTime = formatInTimeZone(new Date(), timezone, 'HH:mm:ss');
-    const logText = `Stopped "${tracker.name}" timer (elapsed: ${newValue}s, completed at: ${completedTime})`;
+    const formattedElapsed = formatElapsedTime(newValue);
+    const logText = `Stopped "${tracker.name}" timer (elapsed: ${formattedElapsed}, completed at: ${completedTime})`;
     const currentDate = getCurrentDateInUserTimezone(userId);
     dataAccess.createActivityEntry(userId, currentDate, logText);
   }
@@ -2723,7 +2739,7 @@ app.post('/api/points/redeem', authMiddleware, (req, res) => {
     const newBalance = dataAccess.getPointsBalance(userId);
 
     // Create a reward ticket task for today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCurrentDateInUserTimezone(userId);
     const taskId = dataAccess.createDailyTask(
       userId,
       today,
