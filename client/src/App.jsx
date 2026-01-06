@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from './services/api';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import { CurrentDateProvider, useCurrentDate } from './contexts/CurrentDateContext';
@@ -10,11 +10,14 @@ import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 import SettingsDropdown from './components/SettingsDropdown';
 import UserManagementModal from './components/UserManagementModal';
+import QuickLogButton from './components/QuickLogButton';
 import { FloatingOtterBottom } from './components/OtterDecorations';
 import logo from './assets/logo.svg';
 
 function AuthenticatedAppContent() {
   const { currentDate, isViewingHistoricalDate } = useCurrentDate();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -25,6 +28,41 @@ function AuthenticatedAppContent() {
 
   // Export dropdown state
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+  // Swipe navigation state
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  // Page navigation order
+  const pages = ['/', '/trackers', '/profile'];
+  const minSwipeDistance = 100;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    const currentIndex = pages.indexOf(location.pathname);
+
+    if (isLeftSwipe && currentIndex < pages.length - 1) {
+      // Swipe left - go to next page
+      navigate(pages[currentIndex + 1]);
+    } else if (isRightSwipe && currentIndex > 0) {
+      // Swipe right - go to previous page
+      navigate(pages[currentIndex - 1]);
+    }
+  };
 
   useEffect(() => {
     // Check authentication on mount
@@ -217,7 +255,12 @@ function AuthenticatedAppContent() {
           </div>
         </nav>
 
-        <main style={{ paddingBottom: '450px' }}>
+        <main
+          style={{ paddingBottom: '450px' }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/trackers" element={<Trackers />} />
@@ -232,6 +275,9 @@ function AuthenticatedAppContent() {
           onClose={handleCloseUserManagement}
           currentUser={user}
         />
+
+        {/* Quick Log Floating Action Button - Available on All Pages */}
+        <QuickLogButton />
       </div>
   );
 }
