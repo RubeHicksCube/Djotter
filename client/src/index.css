@@ -2258,6 +2258,15 @@ textarea:focus {
   border-color: var(--accent-primary);
 }
 
+.quick-log-content .image-preview {
+  max-width: 100%;
+  margin-top: 0.75rem;
+}
+
+.quick-log-content .image-preview img {
+  max-height: 300px;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
