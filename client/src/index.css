@@ -643,6 +643,116 @@ main {
   align-items: center;
 }
 
+/* Export Dropdown Styles */
+.nav-export-dropdown {
+  position: relative;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 150px;
+  overflow: hidden;
+}
+
+.export-option {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.export-option:hover {
+  background: var(--hover-bg);
+}
+
+.export-option:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .nav-export-dropdown {
+    width: 100%;
+  }
+
+  .export-dropdown-menu {
+    left: 0;
+    right: 0;
+    min-width: unset;
+    width: 100%;
+  }
+
+  .snapshot-item {
+    touch-action: pan-y;
+  }
+
+  /* Improve button sizing on mobile */
+  .btn {
+    min-height: 44px; /* iOS touch target size */
+    padding: 0.5rem 1rem;
+  }
+
+  .btn-sm {
+    min-height: 36px;
+    padding: 0.4rem 0.8rem;
+  }
+
+  /* Stack file type buttons on mobile */
+  .export-section .form-row {
+    flex-direction: column;
+  }
+
+  /* Full-width modals on mobile */
+  .modal {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    height: 90vh !important;
+  }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+  /* Increase touch targets for mobile */
+  input[type="checkbox"] {
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  button {
+    cursor: default;
+  }
+
+  /* Improve select inputs on touch devices */
+  select {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+
+  input[type="text"],
+  input[type="date"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+}
+
 header {
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
@@ -1249,6 +1359,45 @@ header h1 {
 .manual-time-input input:focus {
   outline: none;
   border-color: var(--accent-primary);
+}
+
+/* Enhanced Timer Controls */
+.timer-controls-enhanced {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.timer-controls-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.timer-quick-adjust {
+  justify-content: center;
+}
+
+.btn-adjust {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  min-width: 48px;
+  transition: all 0.2s;
+}
+
+.btn-adjust:hover {
+  background: var(--hover-bg);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.btn-adjust:active {
+  transform: translateY(0);
 }
 
 .btn-timer,

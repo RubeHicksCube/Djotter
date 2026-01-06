@@ -830,6 +830,7 @@ export default function Home() {
           <h2>🔍 Daily Data</h2>
           <p className="card-description">Search logs by text or view snapshots by date</p>
           
+          {/* Calendar Section - Always Visible */}
           {/* Calendar Toggle */}
           <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -841,16 +842,6 @@ export default function Home() {
               >
                 📅 Calendar {showCalendar ? '▲' : '▼'}
               </button>
-              {showCalendar && availableDates && availableDates.length > 0 && (
-                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  {availableDates.length} days with data
-                </span>
-              )}
-              {showCalendar && (!availableDates || availableDates.length === 0) && (
-                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  No snapshots saved yet
-                </span>
-              )}
             </div>
 
             {/* Expanding Calendar Section */}
@@ -860,8 +851,7 @@ export default function Home() {
                 padding: '1rem',
                 backgroundColor: 'var(--bg-secondary)',
                 borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-                transition: 'all 0.3s ease'
+                border: '1px solid var(--border-color)'
               }}>
                 <ContributionCalendar
                   availableDates={availableDates || []}

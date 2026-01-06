@@ -1507,6 +1507,101 @@ app.post('/api/exports/download-range-pdf', async (req, res) => {
         doc.moveDown();
       }
 
+      // Profile Fields
+      if (userProfileFields && Object.keys(userProfileFields).length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('PROFILE FIELDS', { underline: true });
+        doc.moveDown(0.5);
+        Object.entries(userProfileFields).forEach(([key, value]) => {
+          doc.fontSize(12).fillColor('#000000').text(`${key}: ${value}`);
+        });
+        doc.moveDown();
+      }
+
+      // Sleep Metrics
+      if (snapshot.previousBedtime || snapshot.wakeTime) {
+        doc.fontSize(16).fillColor('#6B46C1').text('SLEEP METRICS', { underline: true });
+        doc.moveDown(0.5);
+        if (snapshot.previousBedtime) {
+          doc.fontSize(12).fillColor('#000000').text(`Bedtime: ${snapshot.previousBedtime}`);
+        }
+        if (snapshot.wakeTime) {
+          doc.fontSize(12).fillColor('#000000').text(`Wake Time: ${snapshot.wakeTime}`);
+        }
+        doc.moveDown();
+      }
+
+      // Time Since Trackers
+      if (snapshot.timeSinceTrackers && snapshot.timeSinceTrackers.length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('TIME SINCE TRACKERS', { underline: true });
+        doc.moveDown(0.5);
+        snapshot.timeSinceTrackers.forEach(t => {
+          doc.fontSize(12).fillColor('#000000')
+             .text(`${t.name}: ${calculateTimeSince(t.date)} (since ${t.date})`);
+        });
+        doc.moveDown();
+      }
+
+      // Duration Trackers
+      if (snapshot.durationTrackers && snapshot.durationTrackers.length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('DURATION TRACKERS', { underline: true });
+        doc.moveDown(0.5);
+        snapshot.durationTrackers.forEach(t => {
+          if (t.type === 'timer') {
+            const formatted = formatDuration(t.value);
+            const running = t.isRunning ? ' (RUNNING)' : '';
+            doc.fontSize(12).fillColor('#000000').text(`${t.name}: ${formatted}${running}`);
+          } else if (t.type === 'counter') {
+            doc.fontSize(12).fillColor('#000000').text(`${t.name}: ${t.value} minutes`);
+          }
+        });
+        doc.moveDown();
+      }
+
+      // Custom Counters
+      if (snapshot.customCounters && snapshot.customCounters.length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('CUSTOM COUNTERS', { underline: true });
+        doc.moveDown(0.5);
+        snapshot.customCounters.forEach(c => {
+          doc.fontSize(12).fillColor('#000000').text(`${c.name}: ${c.value}`);
+        });
+        doc.moveDown();
+      }
+
+      // Template Fields
+      if (snapshot.customFields && snapshot.customFields.length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('TEMPLATE FIELDS', { underline: true });
+        doc.moveDown(0.5);
+        snapshot.customFields.forEach(f => {
+          if (f.value) {
+            doc.fontSize(12).fillColor('#000000').text(`${f.key}: ${f.value}`);
+          }
+        });
+        doc.moveDown();
+      }
+
+      // Daily Fields
+      if (snapshot.dailyCustomFields && snapshot.dailyCustomFields.length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('DAILY FIELDS', { underline: true });
+        doc.moveDown(0.5);
+        snapshot.dailyCustomFields.forEach(f => {
+          if (f.value) {
+            doc.fontSize(12).fillColor('#000000').text(`${f.key}: ${f.value}`);
+          }
+        });
+        doc.moveDown();
+      }
+
+      // Tasks
+      if (snapshot.tasks && snapshot.tasks.length > 0) {
+        doc.fontSize(16).fillColor('#6B46C1').text('TASKS', { underline: true });
+        doc.moveDown(0.5);
+        snapshot.tasks.forEach(task => {
+          const checkbox = task.completed ? '[✓]' : '[ ]';
+          doc.fontSize(12).fillColor('#000000').text(`${checkbox} ${task.text}`);
+        });
+        doc.moveDown();
+      }
+
       // Activity Entries
       if (snapshot.entries && snapshot.entries.length > 0) {
         doc.fontSize(16).fillColor('#6B46C1').text('ACTIVITY ENTRIES', { underline: true });
@@ -1537,6 +1632,110 @@ app.post('/api/exports/download-range-pdf', async (req, res) => {
     console.error('Error generating PDF zip:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to generate PDF zip', details: error.message });
+    }
+  }
+});
+
+// Download CSV for date range
+app.post('/api/exports/download-range-csv', async (req, res) => {
+  const { startDate, endDate, token } = req.body;
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
+  const userId = decoded.id;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date required' });
+  }
+
+  try {
+    // Get all snapshots in date range
+    const allSnapshots = dataAccess.getSnapshots(userId);
+    const snapshotsInRange = allSnapshots.filter(s => s.date >= startDate && s.date <= endDate);
+
+    if (snapshotsInRange.length === 0) {
+      return res.status(404).json({ error: 'No snapshots available in this date range' });
+    }
+
+    const username = dataAccess.getUserById(userId)?.username;
+
+    // Build CSV content
+    let csv = 'Date,Username,Bedtime,Wake Time,Entry Time,Entry Text,Tasks,Completed Tasks,Time Since Trackers,Duration Trackers,Custom Counters\n';
+
+    snapshotsInRange.forEach((snapshotMeta) => {
+      const snapshot = dataAccess.getSnapshot(userId, snapshotMeta.date);
+      if (!snapshot) return;
+
+      const date = snapshot.date || '';
+      const user = (username || '').replace(/"/g, '""');
+      const bedtime = (snapshot.previousBedtime || '').replace(/"/g, '""');
+      const wakeTime = (snapshot.wakeTime || '').replace(/"/g, '""');
+
+      // Duration Trackers summary
+      let durationTrackersStr = '';
+      if (snapshot.durationTrackers && snapshot.durationTrackers.length > 0) {
+        durationTrackersStr = snapshot.durationTrackers.map(t => {
+          if (t.type === 'timer') {
+            return `${t.name}: ${formatDuration(t.value)}`;
+          } else {
+            return `${t.name}: ${t.value} min`;
+          }
+        }).join('; ');
+      }
+
+      // Time Since Trackers summary
+      let timeSinceStr = '';
+      if (snapshot.timeSinceTrackers && snapshot.timeSinceTrackers.length > 0) {
+        timeSinceStr = snapshot.timeSinceTrackers.map(t =>
+          `${t.name}: ${calculateTimeSince(t.date)}`
+        ).join('; ');
+      }
+
+      // Custom Counters summary
+      let customCountersStr = '';
+      if (snapshot.customCounters && snapshot.customCounters.length > 0) {
+        customCountersStr = snapshot.customCounters.map(c =>
+          `${c.name}: ${c.value}`
+        ).join('; ');
+      }
+
+      // Tasks summary
+      let tasksStr = '';
+      let completedTasksStr = '';
+      if (snapshot.tasks && snapshot.tasks.length > 0) {
+        tasksStr = snapshot.tasks.length.toString();
+        completedTasksStr = snapshot.tasks.filter(t => t.completed).length.toString();
+      }
+
+      // Add rows for each entry
+      if (snapshot.entries && snapshot.entries.length > 0) {
+        snapshot.entries.forEach(entry => {
+          const timestamp = (entry.timestamp || '').replace(/"/g, '""');
+          const text = (entry.text || '').replace(/"/g, '""').replace(/\n/g, ' ');
+          csv += `"${date}","${user}","${bedtime}","${wakeTime}","${timestamp}","${text}","${tasksStr}","${completedTasksStr}","${timeSinceStr}","${durationTrackersStr}","${customCountersStr}"\n`;
+        });
+      } else {
+        // No entries, still include snapshot metadata
+        csv += `"${date}","${user}","${bedtime}","${wakeTime}","","","${tasksStr}","${completedTasksStr}","${timeSinceStr}","${durationTrackersStr}","${customCountersStr}"\n`;
+      }
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="snapshots_${startDate}_to_${endDate}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Error generating CSV:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to generate CSV', details: error.message });
     }
   }
 });
@@ -1588,6 +1787,70 @@ app.post('/api/exports/download-zip', async (req, res) => {
       throw err;
     });
 
+    // Generate CSV if requested
+    if (fileType === 'csv' || fileType === 'all') {
+      let csv = 'Date,Username,Bedtime,Wake Time,Entry Time,Entry Text,Tasks,Completed Tasks,Time Since Trackers,Duration Trackers,Custom Counters\n';
+
+      dates.forEach(date => {
+        const snapshot = dataAccess.getSnapshot(userId, date);
+        if (!snapshot) return;
+
+        const user = (username || '').replace(/"/g, '""');
+        const bedtime = (snapshot.previousBedtime || '').replace(/"/g, '""');
+        const wakeTime = (snapshot.wakeTime || '').replace(/"/g, '""');
+
+        // Duration Trackers summary
+        let durationTrackersStr = '';
+        if (snapshot.durationTrackers && snapshot.durationTrackers.length > 0) {
+          durationTrackersStr = snapshot.durationTrackers.map(t => {
+            if (t.type === 'timer') {
+              return `${t.name}: ${formatDuration(t.value)}`;
+            } else {
+              return `${t.name}: ${t.value} min`;
+            }
+          }).join('; ');
+        }
+
+        // Time Since Trackers summary
+        let timeSinceStr = '';
+        if (snapshot.timeSinceTrackers && snapshot.timeSinceTrackers.length > 0) {
+          timeSinceStr = snapshot.timeSinceTrackers.map(t =>
+            `${t.name}: ${calculateTimeSince(t.date)}`
+          ).join('; ');
+        }
+
+        // Custom Counters summary
+        let customCountersStr = '';
+        if (snapshot.customCounters && snapshot.customCounters.length > 0) {
+          customCountersStr = snapshot.customCounters.map(c =>
+            `${c.name}: ${c.value}`
+          ).join('; ');
+        }
+
+        // Tasks summary
+        let tasksStr = '';
+        let completedTasksStr = '';
+        if (snapshot.tasks && snapshot.tasks.length > 0) {
+          tasksStr = snapshot.tasks.length.toString();
+          completedTasksStr = snapshot.tasks.filter(t => t.completed).length.toString();
+        }
+
+        // Add rows for each entry
+        if (snapshot.entries && snapshot.entries.length > 0) {
+          snapshot.entries.forEach(entry => {
+            const timestamp = (entry.timestamp || '').replace(/"/g, '""');
+            const text = (entry.text || '').replace(/"/g, '""').replace(/\n/g, ' ');
+            csv += `"${date}","${user}","${bedtime}","${wakeTime}","${timestamp}","${text}","${tasksStr}","${completedTasksStr}","${timeSinceStr}","${durationTrackersStr}","${customCountersStr}"\n`;
+          });
+        } else {
+          // No entries, still include snapshot metadata
+          csv += `"${date}","${user}","${bedtime}","${wakeTime}","","","${tasksStr}","${completedTasksStr}","${timeSinceStr}","${durationTrackersStr}","${customCountersStr}"\n`;
+        }
+      });
+
+      archive.append(csv, { name: `snapshots_combined.csv` });
+    }
+
     // Add each snapshot to the archive
     for (const date of dates) {
       const snapshot = dataAccess.getSnapshot(userId, date);
@@ -1596,12 +1859,12 @@ app.post('/api/exports/download-zip', async (req, res) => {
         continue;
       }
 
-      if (fileType === 'markdown' || fileType === 'both') {
+      if (fileType === 'markdown' || fileType === 'all') {
         const markdown = generateMarkdownWithYAML(snapshot, username, userProfileFields);
         archive.append(markdown, { name: `snapshot_${date}.md` });
       }
 
-      if (fileType === 'pdf' || fileType === 'both') {
+      if (fileType === 'pdf' || fileType === 'all') {
         // Generate PDF for this snapshot
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
         const buffers = [];
@@ -1813,12 +2076,132 @@ app.post('/api/trackers/timer/start/:id', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const id = parseInt(req.params.id);
 
-  // Update tracker in database
+  // Update tracker in database - auto-unlock when starting
   dataAccess.updateDurationTracker(id, {
     isRunning: true,
+    isLocked: false, // Auto-unlock when starting
     startTime: new Date().toISOString()
   });
 
+  invalidateUserCache(userId);
+  const state = getUserState(userId);
+  res.json(state);
+});
+
+// Pause timer (stops without locking, allows resume)
+app.post('/api/trackers/timer/pause/:id', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const id = parseInt(req.params.id);
+
+  // Get current tracker state
+  const trackers = dataAccess.getDurationTrackers(userId);
+  const tracker = trackers.find(t => t.id === id);
+
+  if (tracker && tracker.type === 'timer' && tracker.isRunning) {
+    const elapsed = Date.now() - new Date(tracker.startTime).getTime();
+    const newElapsedMs = (tracker.elapsedMs || 0) + elapsed;
+    const newValue = Math.floor(newElapsedMs / 1000);
+
+    dataAccess.updateDurationTracker(id, {
+      elapsedMs: newElapsedMs,
+      value: newValue,
+      isRunning: false,
+      isLocked: false, // Paused but NOT locked - allows resume
+      startTime: null
+    });
+  }
+
+  invalidateUserCache(userId);
+  const state = getUserState(userId);
+  res.json(state);
+});
+
+// Toggle lock state (stop/unlock toggle)
+app.post('/api/trackers/timer/toggle-lock/:id', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const id = parseInt(req.params.id);
+
+  const trackers = dataAccess.getDurationTrackers(userId);
+  const tracker = trackers.find(t => t.id === id);
+
+  if (tracker && tracker.type === 'timer') {
+    const newLockedState = !tracker.isLocked;
+
+    // If running, pause first
+    let updates = {
+      isLocked: newLockedState,
+      isRunning: false // Ensure not running when toggling lock
+    };
+
+    // Calculate elapsed time if currently running
+    if (tracker.isRunning) {
+      const elapsed = Date.now() - new Date(tracker.startTime).getTime();
+      const newElapsedMs = (tracker.elapsedMs || 0) + elapsed;
+      const newValue = Math.floor(newElapsedMs / 1000);
+      updates.elapsedMs = newElapsedMs;
+      updates.value = newValue;
+      updates.startTime = null;
+    }
+
+    // If locking, create activity log
+    if (newLockedState) {
+      const settings = dataAccess.getUserSettings(userId);
+      const timezone = settings?.timezone || 'UTC';
+      const completedTime = formatInTimeZone(new Date(), timezone, 'HH:mm:ss');
+      const finalValue = updates.value || tracker.value || 0;
+      const formattedElapsed = formatElapsedTime(finalValue);
+      const logText = `Stopped "${tracker.name}" timer (elapsed: ${formattedElapsed}, completed at: ${completedTime})`;
+      const currentDate = getCurrentDateInUserTimezone(userId);
+      dataAccess.createActivityEntry(userId, currentDate, logText);
+    }
+
+    dataAccess.updateDurationTracker(id, updates);
+  }
+
+  invalidateUserCache(userId);
+  const state = getUserState(userId);
+  res.json(state);
+});
+
+// Adjust timer time by adding/subtracting milliseconds
+app.post('/api/trackers/timer/adjust-time/:id', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const id = parseInt(req.params.id);
+  const { adjustmentMs } = req.body;
+
+  if (!adjustmentMs || isNaN(adjustmentMs)) {
+    return res.status(400).json({ error: 'Invalid adjustment value' });
+  }
+
+  const trackers = dataAccess.getDurationTrackers(userId);
+  const tracker = trackers.find(t => t.id === id);
+
+  if (tracker && tracker.type === 'timer') {
+    if (tracker.isRunning) {
+      // Timer is running: adjust startTime to maintain continuity
+      const currentElapsed = Date.now() - new Date(tracker.startTime).getTime();
+      const totalElapsed = (tracker.elapsedMs || 0) + currentElapsed;
+      const newElapsed = Math.max(0, totalElapsed + adjustmentMs);
+
+      // Calculate new startTime to maintain continuity
+      const newStartTime = new Date(Date.now() - (newElapsed - (tracker.elapsedMs || 0))).toISOString();
+
+      dataAccess.updateDurationTracker(id, {
+        startTime: newStartTime
+      });
+    } else {
+      // Timer is paused/stopped: adjust elapsedMs directly
+      const newElapsedMs = Math.max(0, (tracker.elapsedMs || 0) + adjustmentMs);
+      const newValue = Math.floor(newElapsedMs / 1000);
+
+      dataAccess.updateDurationTracker(id, {
+        elapsedMs: newElapsedMs,
+        value: newValue
+      });
+    }
+  }
+
+  invalidateUserCache(userId);
   const state = getUserState(userId);
   res.json(state);
 });

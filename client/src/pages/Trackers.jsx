@@ -314,6 +314,32 @@ const calculateDaysSince = (date) => {
     }
   };
 
+  const handlePauseTimer = async (id) => {
+    try {
+      const data = await api.pauseTimer(id);
+      setState(data);
+    } catch (error) {
+      console.error('Error pausing timer:', error);
+    }
+  };
+
+  const handleToggleLock = async (id) => {
+    try {
+      const data = await api.toggleTimerLock(id);
+      setState(data);
+    } catch (error) {
+      console.error('Error toggling lock:', error);
+    }
+  };
+
+  const handleAdjustTime = async (id, adjustmentMs) => {
+    try {
+      const data = await api.adjustTimerTime(id, adjustmentMs);
+      setState(data);
+    } catch (error) {
+      console.error('Error adjusting time:', error);
+    }
+  };
 
   const handleCreateCustomCounter = async (e) => {
     e.preventDefault();
@@ -529,29 +555,79 @@ const calculateDaysSince = (date) => {
                           </span>
                         </div>
                         <div className="tracker-controls">
-                          <div className="timer-controls">
-                            <button
-                              onClick={() => tracker.isRunning ? handleStopTimer(tracker.id) : handleStartTimer(tracker.id)}
-                              className={`btn btn-sm ${tracker.isRunning ? 'btn-danger' : tracker.isLocked ? 'btn-secondary' : 'btn-success'} ${tracker.isLocked ? 'locked' : ''}`}
-                              disabled={tracker.isLocked && !tracker.isRunning}
-                              title={tracker.isLocked ? 'Timer is locked - reset to unlock' : (tracker.isRunning ? 'Stop timer' : 'Start timer')}
-                            >
-                              {tracker.isRunning ? '⏸️' : (tracker.isLocked ? '🔒' : '▶️')}
-                            </button>
-                            <button
-                              onClick={() => handleResetTimer(tracker.id)}
-                              className="btn btn-sm btn-secondary"
-                              title={tracker.isLocked ? 'Reset to unlock timer' : 'Reset timer'}
-                            >
-                              🔄
-                            </button>
-                            <button
-                              onClick={() => setShowManualInput(prev => ({ ...prev, [tracker.id]: !prev[tracker.id] }))}
-                              className="btn btn-sm btn-primary"
-                              title="Set manual time"
-                            >
-                              ⏱️
-                            </button>
+                          <div className="timer-controls-enhanced">
+                            {/* Row 1: Primary controls */}
+                            <div className="timer-controls-row">
+                              {/* Play/Pause button */}
+                              <button
+                                onClick={() => tracker.isRunning ? handlePauseTimer(tracker.id) : handleStartTimer(tracker.id)}
+                                className={`btn btn-sm ${tracker.isRunning ? 'btn-warning' : 'btn-success'}`}
+                                disabled={tracker.isLocked}
+                                title={tracker.isLocked ? 'Unlock to resume' : (tracker.isRunning ? 'Pause timer' : 'Start/Resume timer')}
+                              >
+                                {tracker.isRunning ? '⏸️' : '▶️'}
+                              </button>
+
+                              {/* Stop/Lock Toggle button */}
+                              <button
+                                onClick={() => handleToggleLock(tracker.id)}
+                                className={`btn btn-sm ${tracker.isLocked ? 'btn-secondary' : 'btn-danger'}`}
+                                title={tracker.isLocked ? 'Click to unlock' : 'Click to stop and lock'}
+                              >
+                                {tracker.isLocked ? '🔓' : '⏹️'}
+                              </button>
+
+                              {/* Reset button */}
+                              <button
+                                onClick={() => handleResetTimer(tracker.id)}
+                                className="btn btn-sm btn-secondary"
+                                disabled={tracker.isLocked}
+                                title={tracker.isLocked ? 'Unlock to reset' : 'Reset to 0:00'}
+                              >
+                                🔄
+                              </button>
+
+                              {/* Manual time button */}
+                              <button
+                                onClick={() => setShowManualInput(prev => ({ ...prev, [tracker.id]: !prev[tracker.id] }))}
+                                className="btn btn-sm btn-primary"
+                                title="Set manual time"
+                              >
+                                ⏱️
+                              </button>
+                            </div>
+
+                            {/* Row 2: Quick adjustment buttons */}
+                            <div className="timer-controls-row timer-quick-adjust">
+                              <button
+                                onClick={() => handleAdjustTime(tracker.id, -3600000)}
+                                className="btn btn-sm btn-adjust"
+                                title="Subtract 1 hour"
+                              >
+                                -1h
+                              </button>
+                              <button
+                                onClick={() => handleAdjustTime(tracker.id, -300000)}
+                                className="btn btn-sm btn-adjust"
+                                title="Subtract 5 minutes"
+                              >
+                                -5m
+                              </button>
+                              <button
+                                onClick={() => handleAdjustTime(tracker.id, 300000)}
+                                className="btn btn-sm btn-adjust"
+                                title="Add 5 minutes"
+                              >
+                                +5m
+                              </button>
+                              <button
+                                onClick={() => handleAdjustTime(tracker.id, 3600000)}
+                                className="btn btn-sm btn-adjust"
+                                title="Add 1 hour"
+                              >
+                                +1h
+                              </button>
+                            </div>
                           </div>
                           {showManualInput[tracker.id] && (
                             <div className="manual-time-input">

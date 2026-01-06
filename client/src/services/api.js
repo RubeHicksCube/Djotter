@@ -151,6 +151,31 @@ export const api = {
     return response.json();
   },
 
+  pauseTimer: async (id) => {
+    const response = await fetch(`${API_BASE}/trackers/timer/pause/${id}`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return response.json();
+  },
+
+  toggleTimerLock: async (id) => {
+    const response = await fetch(`${API_BASE}/trackers/timer/toggle-lock/${id}`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return response.json();
+  },
+
+  adjustTimerTime: async (id, adjustmentMs) => {
+    const response = await fetch(`${API_BASE}/trackers/timer/adjust-time/${id}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ adjustmentMs })
+    });
+    return response.json();
+  },
+
   // Custom Counters (water, coffee, etc.)
   createCustomCounter: async (name) => {
     const response = await fetch(`${API_BASE}/custom-counters/create`, {
@@ -426,6 +451,36 @@ export const api = {
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `${API_BASE}/exports/download-range-pdf`;
+    form.target = '_blank';
+
+    const tokenInput = document.createElement('input');
+    tokenInput.type = 'hidden';
+    tokenInput.name = 'token';
+    tokenInput.value = token;
+    form.appendChild(tokenInput);
+
+    const startInput = document.createElement('input');
+    startInput.type = 'hidden';
+    startInput.name = 'startDate';
+    startInput.value = startDate;
+    form.appendChild(startInput);
+
+    const endInput = document.createElement('input');
+    endInput.type = 'hidden';
+    endInput.name = 'endDate';
+    endInput.value = endDate;
+    form.appendChild(endInput);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  },
+
+  downloadDateRangeCSV: (startDate, endDate) => {
+    const token = localStorage.getItem('authToken');
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `${API_BASE}/exports/download-range-csv`;
     form.target = '_blank';
 
     const tokenInput = document.createElement('input');

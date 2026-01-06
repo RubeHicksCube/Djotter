@@ -23,6 +23,9 @@ function AuthenticatedAppContent() {
   // User Management modal state (available on all pages)
   const [showUserManagement, setShowUserManagement] = useState(false);
 
+  // Export dropdown state
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
   useEffect(() => {
     // Check authentication on mount
     if (!api.isLoggedIn()) {
@@ -105,6 +108,36 @@ function AuthenticatedAppContent() {
     }
   };
 
+  const handleDownloadCSV = async () => {
+    try {
+      const date = isViewingHistoricalDate ? currentDate : null;
+      // Note: This may need a new API endpoint
+      if (api.downloadCSV) {
+        await api.downloadCSV(date);
+      } else {
+        alert('CSV download not yet implemented');
+      }
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      alert('Failed to download CSV');
+    }
+  };
+
+  const handleDownloadZIP = async () => {
+    try {
+      const date = isViewingHistoricalDate ? currentDate : null;
+      // Note: This may need a new API endpoint for combined ZIP
+      if (api.downloadZIP) {
+        await api.downloadZIP(date);
+      } else {
+        alert('ZIP download not yet implemented');
+      }
+    } catch (error) {
+      console.error('Error downloading ZIP:', error);
+      alert('Failed to download ZIP');
+    }
+  };
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -139,15 +172,35 @@ function AuthenticatedAppContent() {
 
             {/* Action Buttons */}
             <div className={`nav-actions ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-              <button onClick={handleSaveSnapshot} className="btn btn-sm btn-warning" title="Save today's snapshot">
-                💾 Save
-              </button>
-              <button onClick={handleDownloadToday} className="btn btn-sm btn-success" title="Download today's markdown">
-                📥 Markdown
-              </button>
-              <button onClick={handleDownloadPDF} className="btn btn-sm btn-success" title="Download today's PDF">
-                📄 PDF
-              </button>
+              <div className="nav-export-dropdown">
+                <button
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  className="btn btn-sm btn-primary"
+                  style={{ position: 'relative' }}
+                >
+                  📦 Export {exportMenuOpen ? '▲' : '▼'}
+                </button>
+
+                {exportMenuOpen && (
+                  <div className="export-dropdown-menu">
+                    <button onClick={() => { handleSaveSnapshot(); setExportMenuOpen(false); }} className="export-option">
+                      💾 Save
+                    </button>
+                    <button onClick={() => { handleDownloadToday(); setExportMenuOpen(false); }} className="export-option">
+                      📥 Markdown
+                    </button>
+                    <button onClick={() => { handleDownloadPDF(); setExportMenuOpen(false); }} className="export-option">
+                      📄 PDF
+                    </button>
+                    <button onClick={() => { handleDownloadCSV(); setExportMenuOpen(false); }} className="export-option">
+                      📊 CSV
+                    </button>
+                    <button onClick={() => { handleDownloadZIP(); setExportMenuOpen(false); }} className="export-option">
+                      📦 ZIP (All)
+                    </button>
+                  </div>
+                )}
+              </div>
               {user && (
                 <>
                   <SettingsDropdown

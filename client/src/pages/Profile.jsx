@@ -525,6 +525,21 @@ export default function Profile() {
     setMessage(`Downloading PDF export from ${startDate} to ${endDate}...`);
   };
 
+  const handleDownloadRangeCSV = () => {
+    if (!startDate || !endDate) {
+      setMessage('Please select both start and end dates');
+      return;
+    }
+
+    if (startDate > endDate) {
+      setMessage('Start date must be before end date');
+      return;
+    }
+
+    api.downloadDateRangeCSV(startDate, endDate);
+    setMessage(`Downloading CSV export from ${startDate} to ${endDate}...`);
+  };
+
   const handleRedeemPoints = async () => {
     if (!rewardDescription.trim() || pointsCost <= 0) {
       setMessage('Please enter a valid reward and points cost');
@@ -850,6 +865,7 @@ export default function Profile() {
             setEndDate={setEndDate}
             handleDownloadRange={handleDownloadRange}
             handleDownloadRangePDF={handleDownloadRangePDF}
+            handleDownloadRangeCSV={handleDownloadRangeCSV}
             formatDateDisplay={formatDateDisplay}
           />
           </div>

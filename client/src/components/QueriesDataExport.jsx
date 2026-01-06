@@ -21,6 +21,7 @@ function QueriesDataExport({
   setEndDate,
   handleDownloadRange,
   handleDownloadRangePDF,
+  handleDownloadRangeCSV,
   formatDateDisplay
 }) {
   const [queryType, setQueryType] = useState('tasks');
@@ -46,6 +47,47 @@ function QueriesDataExport({
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [dateRangeSet, setDateRangeSet] = useState(false);
+
+  // Swipe state for mobile interactions
+  const [swipedItem, setSwipedItem] = useState(null);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  // Swipe gesture handlers
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e, date) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = (date) => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      // Swipe left - show delete action
+      setSwipedItem(date);
+    } else if (isRightSwipe) {
+      // Swipe right - toggle selection
+      if (selectedSnapshots.includes(date)) {
+        setSelectedSnapshots(selectedSnapshots.filter(d => d !== date));
+      } else {
+        setSelectedSnapshots([...selectedSnapshots, date]);
+      }
+      setSwipedItem(null);
+    } else {
+      // Tap or insufficient swipe - close any open swipe
+      setSwipedItem(null);
+    }
+  };
 
   useEffect(() => {
     // Fetch custom field templates on mount
@@ -271,60 +313,166 @@ function QueriesDataExport({
       <h2>📊 Queries & Data Export</h2>
       <p className="card-description">Query tasks and fields with analytics, or manage daily snapshots</p>
 
-      {/* Calendar Toggle for Snapshots */}
-      {queryType === 'snapshots' && (
-        <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setShowCalendar(!showCalendar)}
-              className={`btn btn-sm ${showCalendar ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              📅 Calendar {showCalendar ? '▲' : '▼'}
-            </button>
-            {showCalendar && availableDates && availableDates.length > 0 && (
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {availableDates.length} days with data
-              </span>
-            )}
-            {showCalendar && (!availableDates || availableDates.length === 0) && (
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                No snapshots saved yet
-              </span>
-            )}
-            {showCalendar && (
-              <span style={{
-                fontSize: '0.75rem',
-                color: 'var(--primary-color)',
-                fontStyle: 'italic',
-                marginLeft: 'auto'
-              }}>
-                💡 Click a date to select it for export
-              </span>
-            )}
-          </div>
+      {/* Always-Visible Calendar & Date Range Picker */}
+      <div style={{
+        marginBottom: '1.5rem',
+        padding: '1.5rem',
+        backgroundColor: 'var(--bg-secondary)',
+        borderRadius: '8px',
+        border: '2px solid rgba(59, 130, 246, 0.3)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h3 style={{
+          margin: '0 0 1rem 0',
+          fontSize: '1rem',
+          color: 'var(--accent-primary)'
+        }}>
+          📅 Select Date Range
+        </h3>
 
-          {/* Expanding Calendar Section */}
-          {showCalendar && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '1rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)',
-              transition: 'all 0.3s ease'
-            }}>
-              <ContributionCalendar
-                availableDates={availableDates || []}
-                formatDateDisplay={formatDateDisplay}
-                compact={true}
-                onDateClick={handleCalendarDateClick}
+        {/* Calendar */}
+        <ContributionCalendar
+          availableDates={availableDates || []}
+          formatDateDisplay={formatDateDisplay}
+          compact={true}
+          onDateClick={handleCalendarDateClick}
+        />
+
+        {/* Date Range Inputs */}
+        <div style={{ marginTop: '1rem' }}>
+          <div className="form-row" style={{ gap: '1rem' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Start Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ border: startDate ? '2px solid var(--accent-success)' : undefined }}
               />
             </div>
-          )}
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">End Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{ border: endDate ? '2px solid var(--accent-success)' : undefined }}
+              />
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Selected Date Range Display */}
+        {startDate && endDate && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '0.75rem',
+            backgroundColor: 'var(--bg-primary)',
+            borderRadius: '6px',
+            border: '2px solid var(--accent-primary)',
+            textAlign: 'center'
+          }}>
+            <strong style={{ color: 'var(--accent-primary)' }}>Selected:</strong>{' '}
+            {startDate === endDate
+              ? formatDateDisplay(startDate)
+              : `${formatDateDisplay(startDate)} → ${formatDateDisplay(endDate)}`
+            } ({Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1} days)
+          </div>
+        )}
+
+        {/* Last 3 Snapshots Quick Select */}
+        {availableDates && availableDates.length > 0 && (
+          <div style={{ marginTop: '1rem' }}>
+            <h4 style={{ fontSize: '0.875rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+              📋 Quick Select (Last 3)
+            </h4>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '0.5rem'
+            }}>
+              {availableDates.slice().reverse().slice(0, 3).map(date => (
+                <button
+                  key={date}
+                  onClick={() => {
+                    setStartDate(date);
+                    setEndDate(date);
+                    setShouldAutoSubmit(true);
+                  }}
+                  className="btn btn-sm btn-ghost"
+                  style={{
+                    fontSize: '0.875rem',
+                    padding: '0.5rem 0.75rem'
+                  }}
+                >
+                  📅 {formatDateDisplay(date)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Always-Visible Download Buttons */}
+        <div style={{
+          marginTop: '1rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid var(--border-color)'
+        }}>
+          {/* View All Snapshots button */}
+          {availableDates && availableDates.length > 3 && (
+            <button
+              onClick={() => setShowSnapshotModal(true)}
+              className="btn btn-sm btn-ghost"
+              type="button"
+              style={{ width: '100%', marginBottom: '0.5rem' }}
+            >
+              📋 View All Snapshots ({availableDates.length} total)
+            </button>
+          )}
+
+          {/* Export buttons grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+            gap: '0.5rem'
+          }}>
+            <button
+              onClick={handleDownloadRange}
+              disabled={!startDate || !endDate}
+              className="btn btn-sm btn-success"
+            >
+              📥 Markdown
+            </button>
+            <button
+              onClick={handleDownloadRangePDF}
+              disabled={!startDate || !endDate}
+              className="btn btn-sm btn-success"
+            >
+              📄 PDF
+            </button>
+            <button
+              onClick={handleDownloadRangeCSV}
+              disabled={!startDate || !endDate}
+              className="btn btn-sm btn-success"
+            >
+              📊 CSV
+            </button>
+            <button
+              onClick={() => {
+                handleDownloadRange();
+                handleDownloadRangePDF();
+                handleDownloadRangeCSV();
+              }}
+              disabled={!startDate || !endDate}
+              className="btn btn-sm btn-primary"
+            >
+              📦 All
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Unified Query Form */}
       <form onSubmit={handleRunQuery} className="export-section">
@@ -341,32 +489,7 @@ function QueriesDataExport({
           >
             <option value="tasks">Tasks</option>
             <option value="fields">Fields</option>
-            <option value="snapshots">Snapshots</option>
           </select>
-        </div>
-
-        {/* Date Range */}
-        <div className="date-range-form">
-          <div className="form-group">
-            <label>Start Date {dateRangeSet && <span style={{ color: 'var(--success-color)', marginLeft: '0.5rem' }}>✓ Updated</span>}</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {setStartDate(e.target.value); setDateRangeSet(false);}}
-              required={queryType !== 'snapshots'}
-              style={dateRangeSet ? { borderColor: 'var(--success-color)', borderWidth: '2px' } : {}}
-            />
-          </div>
-          <div className="form-group">
-            <label>End Date {dateRangeSet && <span style={{ color: 'var(--success-color)', marginLeft: '0.5rem' }}>✓ Updated</span>}</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {setEndDate(e.target.value); setDateRangeSet(false);}}
-              required={queryType !== 'snapshots'}
-              style={dateRangeSet ? { borderColor: 'var(--success-color)', borderWidth: '2px' } : {}}
-            />
-          </div>
         </div>
 
         {/* Type-specific filters */}
@@ -479,62 +602,6 @@ function QueriesDataExport({
         {/* Action Buttons */}
         {queryType === 'snapshots' ? (
           <div style={{ marginTop: '1rem' }}>
-            {/* Save Today's Snapshot - Full Width */}
-            <button
-              onClick={handleSaveSnapshot}
-              type="button"
-              className="btn btn-success"
-              style={{ width: '100%', marginBottom: '1rem' }}
-            >
-              💾 Save Today's Snapshot
-            </button>
-
-            {/* Selected Date Range Display */}
-            {startDate && endDate && (
-              <div style={{
-                padding: '1rem',
-                backgroundColor: 'var(--bg-secondary)',
-                borderRadius: '8px',
-                marginBottom: '1rem',
-                border: '2px solid var(--primary-color)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '1.25rem' }}>📅</span>
-                  <strong>Selected Date Range:</strong>
-                </div>
-                <div style={{ fontSize: '1.1rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>
-                  {startDate === endDate
-                    ? formatDateDisplay(startDate)
-                    : `${formatDateDisplay(startDate)} → ${formatDateDisplay(endDate)}`}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  {startDate === endDate ? 'Single snapshot selected' : `${Math.floor((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1} days selected`}
-                </div>
-              </div>
-            )}
-
-            {/* Download Buttons Row */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              <button
-                onClick={handleDownloadRange}
-                type="button"
-                className="btn btn-success"
-                disabled={!startDate || !endDate}
-                style={{ flex: 1, minWidth: '150px' }}
-              >
-                📥 Download Markdown
-              </button>
-              <button
-                onClick={handleDownloadRangePDF}
-                type="button"
-                className="btn btn-success"
-                disabled={!startDate || !endDate}
-                style={{ flex: 1, minWidth: '150px' }}
-              >
-                📄 Download PDF
-              </button>
-            </div>
-
             {/* Retention Settings */}
             <div className="retention-inline">
               <label>Keep last</label>
@@ -844,6 +911,19 @@ function QueriesDataExport({
               backgroundColor: 'var(--bg-secondary)',
               borderBottom: '1px solid var(--border-color)'
             }}>
+              {/* Mobile Swipe Hint */}
+              <div style={{
+                marginBottom: '0.75rem',
+                padding: '0.5rem',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                color: 'var(--accent-primary)',
+                textAlign: 'center'
+              }}>
+                💡 <strong>Mobile:</strong> Swipe ← left to delete, swipe → right to select
+              </div>
+
               {/* Search Input */}
               <div style={{ marginBottom: '1rem' }}>
                 <input
@@ -904,38 +984,92 @@ function QueriesDataExport({
                   No snapshots found matching "{searchFilter}"
                 </div>
               ) : (
-                filteredDates.slice().reverse().map(date => (
-                <label
-                  key={date}
-                  className="snapshot-item"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    padding: '0.75rem',
-                    marginBottom: '0.5rem',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: selectedSnapshots.includes(date) ? 'var(--primary-light)' : 'var(--bg-secondary)',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSnapshots.includes(date)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedSnapshots([...selectedSnapshots, date]);
-                      } else {
-                        setSelectedSnapshots(selectedSnapshots.filter(d => d !== date));
-                      }
-                    }}
-                    style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                  />
-                  <span style={{ flex: 1 }}>📅 {formatDateDisplay(date)}</span>
-                </label>
-              )))}
+                filteredDates.slice().reverse().map(date => {
+                  const isSwiped = swipedItem === date;
+                  const isSelected = selectedSnapshots.includes(date);
+
+                  return (
+                    <div
+                      key={date}
+                      style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        marginBottom: '0.5rem',
+                        borderRadius: '8px'
+                      }}
+                      onTouchStart={(e) => onTouchStart(e, date)}
+                      onTouchMove={onTouchMove}
+                      onTouchEnd={() => onTouchEnd(date)}
+                    >
+                      {/* Delete action background (revealed on left swipe) */}
+                      {isSwiped && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '80px',
+                            backgroundColor: 'var(--danger-color)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            handleDeleteSnapshot(date);
+                            setSwipedItem(null);
+                          }}
+                        >
+                          🗑️ Delete
+                        </div>
+                      )}
+
+                      {/* Main snapshot item */}
+                      <label
+                        className="snapshot-item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '1rem',
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-secondary)',
+                          cursor: 'pointer',
+                          transition: 'transform 0.3s ease, background-color 0.2s',
+                          transform: isSwiped ? 'translateX(-80px)' : 'translateX(0)',
+                          position: 'relative',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedSnapshots([...selectedSnapshots, date]);
+                            } else {
+                              setSelectedSnapshots(selectedSnapshots.filter(d => d !== date));
+                            }
+                          }}
+                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                        />
+                        <span style={{ flex: 1 }}>📅 {formatDateDisplay(date)}</span>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          fontStyle: 'italic'
+                        }}>
+                          {isSelected && '✓'}
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -948,7 +1082,7 @@ function QueriesDataExport({
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
                   File Type:
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => setZipFileType('markdown')}
                     className={zipFileType === 'markdown' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
@@ -964,11 +1098,18 @@ function QueriesDataExport({
                     📄 PDF
                   </button>
                   <button
-                    onClick={() => setZipFileType('both')}
-                    className={zipFileType === 'both' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
+                    onClick={() => setZipFileType('csv')}
+                    className={zipFileType === 'csv' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
                     type="button"
                   >
-                    📦 Both
+                    📊 CSV
+                  </button>
+                  <button
+                    onClick={() => setZipFileType('all')}
+                    className={zipFileType === 'all' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
+                    type="button"
+                  >
+                    📦 All Formats
                   </button>
                 </div>
               </div>

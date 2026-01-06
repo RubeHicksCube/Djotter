@@ -161,20 +161,24 @@ function ContributionCalendar({ availableDates, formatDateDisplay, compact = fal
                       borderRadius: '2px',
                       backgroundColor: getActivityColor(day.activityLevel),
                       border: '1px solid var(--border-color)',
-                      cursor: day.activityLevel > 0 ? 'pointer' : 'default',
+                      cursor: 'pointer',
                       transition: 'all 0.2s ease'
                     }}
-                    title={`${day.dateStr}${day.activityLevel > 0 ? ' - click to view' : ''}`}
+                    title={`${day.dateStr}${day.activityLevel > 0 ? ' - has snapshot' : ' - click to filter'}`}
                     onMouseEnter={(e) => {
                       e.target.style.transform = 'scale(1.2)';
                       e.target.style.borderColor = 'var(--primary-color)';
+                      if (day.activityLevel === 0) {
+                        e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                      }
                     }}
                     onMouseLeave={(e) => {
                       e.target.style.transform = 'scale(1)';
                       e.target.style.borderColor = 'var(--border-color)';
+                      e.target.style.backgroundColor = getActivityColor(day.activityLevel);
                     }}
                     onClick={() => {
-                      if (day.activityLevel > 0 && onDateClick) {
+                      if (onDateClick) {
                         onDateClick(day.dateStr);
                       }
                     }}
