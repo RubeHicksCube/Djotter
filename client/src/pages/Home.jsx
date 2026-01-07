@@ -469,15 +469,17 @@ export default function Home() {
 
     try {
       const currentDate = getTodayInUserTimezone(settings?.timezone || 'UTC');
-      const data = await api.addDailyTask(
+      await api.addDailyTask(
         dailyTaskText,
         taskDueDate || currentDate,
         taskDetails,
         null, // parentTaskId
         taskPoints || 0
       );
-      setState(data);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
       setDailyTaskText('');
       setTaskDueDate('');
       setTaskDetails('');
@@ -534,14 +536,16 @@ export default function Home() {
 
     try {
       const currentDate = getTodayInUserTimezone(settings?.timezone || 'UTC');
-      const data = await api.addDailyTask(
+      await api.addDailyTask(
         subTaskText,
         currentDate,
         null, // details
         parentTaskId
       );
-      setState(data);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
       setSubTaskText('');
       setAddingSubTaskTo(null);
     } catch (error) {
@@ -554,15 +558,17 @@ export default function Home() {
     if (!task) return;
 
     try {
-      const data = await api.updateDailyTask(id, {
+      await api.updateDailyTask(id, {
         text: task.text,
         dueDate: task.dueDate,
         details: task.details,
         pinned: task.pinned,
         recurring: task.recurring
       });
-      setState(data);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
       setEditingTaskId(null);
     } catch (error) {
       console.error('Error updating task:', error);
@@ -571,9 +577,11 @@ export default function Home() {
 
   const handleToggleTaskPinned = async (id) => {
     try {
-      const data = await api.toggleTaskPinned(id);
-      setState(data);
+      await api.toggleTaskPinned(id);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
     } catch (error) {
       console.error('Error toggling task pinned:', error);
     }
@@ -581,9 +589,11 @@ export default function Home() {
 
   const handleToggleTaskRecurring = async (id) => {
     try {
-      const data = await api.toggleTaskRecurring(id);
-      setState(data);
+      await api.toggleTaskRecurring(id);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
     } catch (error) {
       console.error('Error toggling task recurring:', error);
     }
@@ -591,9 +601,11 @@ export default function Home() {
 
   const handleToggleDailyTask = async (id) => {
     try {
-      const data = await api.toggleDailyTask(id);
-      setState(data);
+      await api.toggleDailyTask(id);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
     } catch (error) {
       console.error('Error toggling daily task:', error);
     }
@@ -601,9 +613,11 @@ export default function Home() {
 
   const handleDeleteDailyTask = async (id) => {
     try {
-      const data = await api.deleteDailyTask(id);
-      setState(data);
+      await api.deleteDailyTask(id);
       await loadAllTasks();
+      // Reload state to update activity log
+      const freshState = await api.getState();
+      setState(freshState);
     } catch (error) {
       console.error('Error deleting daily task:', error);
     }
