@@ -49,16 +49,16 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
         trueCount: item.trueCount || 0,
         falseCount: item.falseCount || 0,
         totalCount: item.totalCount || 0,
-        truePercentage: item.truePercentage !== undefined ? parseFloat(item.truePercentage.toFixed(1)) : null
+        truePercentage: item.truePercentage !== undefined && item.truePercentage !== null ? parseFloat(item.truePercentage.toFixed(1)) : null
       }));
     } else if (fieldType === 'number' || fieldType === 'currency') {
       chartData = data.map(item => ({
         date: item.date,
-        value: item.value !== undefined ? parseFloat(item.value.toFixed(2)) : null,
-        min: item.min !== undefined ? parseFloat(item.min.toFixed(2)) : null,
-        max: item.max !== undefined ? parseFloat(item.max.toFixed(2)) : null,
-        avg: item.avg !== undefined ? parseFloat(item.avg.toFixed(2)) : null,
-        sum: item.sum !== undefined ? parseFloat(item.sum.toFixed(2)) : null,
+        value: item.value !== undefined && item.value !== null ? parseFloat(item.value.toFixed(2)) : null,
+        min: item.min !== undefined && item.min !== null ? parseFloat(item.min.toFixed(2)) : null,
+        max: item.max !== undefined && item.max !== null ? parseFloat(item.max.toFixed(2)) : null,
+        avg: item.avg !== undefined && item.avg !== null ? parseFloat(item.avg.toFixed(2)) : null,
+        sum: item.sum !== undefined && item.sum !== null ? parseFloat(item.sum.toFixed(2)) : null,
         count: item.count
       }));
     } else {
@@ -148,7 +148,7 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
               </>
             )}
 
-            {type === 'fields' && fieldType === 'boolean' && (
+            {type === 'fields' && fieldType === 'boolean' && chartData.length > 0 && (
               <>
                 <Line
                   type="stepAfter"
@@ -158,7 +158,7 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
                   name="Value (1=true, 0=false)"
                   dot={{ r: 6 }}
                 />
-                {chartData[0].truePercentage !== null && (
+                {chartData[0].truePercentage !== undefined && chartData[0].truePercentage !== null && (
                   <Line
                     type="monotone"
                     dataKey="truePercentage"
@@ -172,9 +172,9 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
               </>
             )}
 
-            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && (
+            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && chartData.length > 0 && (
               <>
-                {chartData[0].value !== null && (
+                {chartData[0].value !== undefined && chartData[0].value !== null && (
                   <Line
                     type="monotone"
                     dataKey="value"
@@ -184,7 +184,7 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
                     dot={{ r: 4 }}
                   />
                 )}
-                {chartData[0].avg !== null && (
+                {chartData[0].avg !== undefined && chartData[0].avg !== null && (
                   <Line
                     type="monotone"
                     dataKey="avg"
@@ -194,7 +194,7 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
                     dot={{ r: 4 }}
                   />
                 )}
-                {chartData[0].min !== null && (
+                {chartData[0].min !== undefined && chartData[0].min !== null && (
                   <Line
                     type="monotone"
                     dataKey="min"
@@ -205,7 +205,7 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
                     dot={{ r: 3 }}
                   />
                 )}
-                {chartData[0].max !== null && (
+                {chartData[0].max !== undefined && chartData[0].max !== null && (
                   <Line
                     type="monotone"
                     dataKey="max"
@@ -270,15 +270,15 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
               </>
             )}
 
-            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && (
+            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && chartData.length > 0 && (
               <>
-                {chartData[0].value !== null && (
+                {chartData[0].value !== undefined && chartData[0].value !== null && (
                   <Bar dataKey="value" fill="#7B68EE" name="Value" />
                 )}
-                {chartData[0].avg !== null && (
+                {chartData[0].avg !== undefined && chartData[0].avg !== null && (
                   <Bar dataKey="avg" fill="#2196F3" name="Average" />
                 )}
-                {chartData[0].sum !== null && (
+                {chartData[0].sum !== undefined && chartData[0].sum !== null && (
                   <Bar dataKey="sum" fill="#4CAF50" name="Sum" />
                 )}
               </>
