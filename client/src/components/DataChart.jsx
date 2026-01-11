@@ -30,6 +30,8 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
 
   // Transform data for tasks
   let chartData = [];
+  let yAxisDomain = ['auto', 'auto'];
+
   if (type === 'tasks') {
     chartData = data.map(group => ({
       date: group.date,
@@ -51,6 +53,7 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
         totalCount: item.totalCount || 0,
         truePercentage: item.truePercentage !== undefined && item.truePercentage !== null ? parseFloat(item.truePercentage.toFixed(1)) : null
       }));
+      yAxisDomain = [0, 'auto'];
     } else if (fieldType === 'number' || fieldType === 'currency') {
       chartData = data.map(item => ({
         date: item.date,
@@ -61,8 +64,43 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
         sum: item.sum !== undefined && item.sum !== null ? parseFloat(item.sum.toFixed(2)) : null,
         count: item.count
       }));
+
+      // Smart Y-axis scaling for narrow ranges
+      const allValues = chartData.flatMap(d => [d.value, d.min, d.max, d.avg].filter(v => v !== null && v !== undefined));
+      if (allValues.length > 0) {
+        const dataMin = Math.min(...allValues);
+        const dataMax = Math.max(...allValues);
+        const range = dataMax - dataMin;
+
+        // If range is narrow (less than 20% of the max value), add padding
+        if (range < dataMax * 0.2 || range < 10) {
+          const padding = Math.max(range * 0.1, 5);
+          yAxisDomain = [Math.floor(dataMin - padding), Math.ceil(dataMax + padding)];
+        }
+      }
+    } else if (fieldType === 'time') {
+      // Parse time values to minutes since midnight for visualization
+      chartData = data.map(item => {
+        let timeValue = null;
+        if (item.value) {
+          const timeParts = item.value.split(':');
+          if (timeParts.length >= 2) {
+            const hours = parseInt(timeParts[0]);
+            const minutes = parseInt(timeParts[1]);
+            timeValue = hours * 60 + minutes; // Convert to minutes since midnight
+          }
+        }
+        return {
+          date: item.date,
+          timeValue,
+          timeDisplay: item.value,
+          count: item.count || 0,
+          uniqueCount: item.uniqueCount || 0
+        };
+      });
+      yAxisDomain = [0, 24 * 60]; // 0 to 1440 minutes (24 hours)
     } else {
-      // For text, date, time, datetime - show count and unique count
+      // For text, date, datetime - show count and unique count
       chartData = data.map(item => ({
         date: item.date,
         count: item.count || 0,
@@ -70,8 +108,17 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
         mostCommonValue: item.mostCommonValue || '',
         mostCommonCount: item.mostCommonCount || 0
       }));
+      yAxisDomain = [0, 'auto'];
     }
   }
+
+  // Helper function to format minutes to time display
+  const formatMinutesToTime = (minutes) => {
+    if (minutes === null || minutes === undefined) return '';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  };
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -84,16 +131,61 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
           <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold' }}>{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ margin: '0.25rem 0', color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
+          {payload.map((entry, index) => {
+            let displayValue = entry.value;
+            // Format time values
+            if (fieldType === 'time' && entry.dataKey === 'timeValue') {
+              displayValue = formatMinutesToTime(entry.value);
+            }
+            return (
+              <p key={index} style={{ margin: '0.25rem 0', color: entry.color }}>
+                {entry.name}: {displayValue}
+              </p>
+            );
+          })}
         </div>
       );
     }
     return null;
   };
+
+  // For bar charts with numeric/currency fields, create summary data instead of daily data
+  let barChartData = chartData;
+  if (chartType === 'bar' && type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && chartData.length > 0) {
+    // Calculate overall statistics across all dates
+    const allValues = chartData.map(d => d.value).filter(v => v !== null && v !== undefined);
+    const allAvgs = chartData.map(d => d.avg).filter(v => v !== null && v !== undefined);
+    const allSums = chartData.map(d => d.sum).filter(v => v !== null && v !== undefined);
+    const allMins = chartData.map(d => d.min).filter(v => v !== null && v !== undefined);
+    const allMaxs = chartData.map(d => d.max).filter(v => v !== null && v !== undefined);
+
+    barChartData = [];
+
+    if (allValues.length > 0) {
+      const overallValue = allValues.reduce((sum, v) => sum + v, 0) / allValues.length;
+      barChartData.push({ metric: 'Overall Value', value: parseFloat(overallValue.toFixed(2)) });
+    }
+
+    if (allAvgs.length > 0) {
+      const overallAvg = allAvgs.reduce((sum, v) => sum + v, 0) / allAvgs.length;
+      barChartData.push({ metric: 'Average', value: parseFloat(overallAvg.toFixed(2)) });
+    }
+
+    if (allSums.length > 0) {
+      const overallSum = allSums.reduce((sum, v) => sum + v, 0);
+      barChartData.push({ metric: 'Total Sum', value: parseFloat(overallSum.toFixed(2)) });
+    }
+
+    if (allMins.length > 0) {
+      const overallMin = Math.min(...allMins);
+      barChartData.push({ metric: 'Minimum', value: parseFloat(overallMin.toFixed(2)) });
+    }
+
+    if (allMaxs.length > 0) {
+      const overallMax = Math.max(...allMaxs);
+      barChartData.push({ metric: 'Maximum', value: parseFloat(overallMax.toFixed(2)) });
+    }
+  }
 
   return (
     <div style={{
@@ -115,6 +207,8 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
             <YAxis
               stroke="var(--text-secondary)"
               style={{ fontSize: '0.875rem' }}
+              domain={yAxisDomain}
+              tickFormatter={fieldType === 'time' ? formatMinutesToTime : undefined}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
@@ -151,24 +245,21 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
             {type === 'fields' && fieldType === 'boolean' && chartData.length > 0 && (
               <>
                 <Line
-                  type="stepAfter"
-                  dataKey="value"
-                  stroke="#7B68EE"
+                  type="monotone"
+                  dataKey="trueCount"
+                  stroke="#4CAF50"
                   strokeWidth={3}
-                  name="Value (1=true, 0=false)"
-                  dot={{ r: 6 }}
+                  name="True (Checked)"
+                  dot={{ r: 5 }}
                 />
-                {chartData[0].truePercentage !== undefined && chartData[0].truePercentage !== null && (
-                  <Line
-                    type="monotone"
-                    dataKey="truePercentage"
-                    stroke="#4CAF50"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="True %"
-                    dot={{ r: 4 }}
-                  />
-                )}
+                <Line
+                  type="monotone"
+                  dataKey="falseCount"
+                  stroke="#FF9800"
+                  strokeWidth={3}
+                  name="False (Unchecked)"
+                  dot={{ r: 5 }}
+                />
               </>
             )}
 
@@ -219,7 +310,20 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
               </>
             )}
 
-            {type === 'fields' && (fieldType === 'text' || fieldType === 'date' || fieldType === 'time' || fieldType === 'datetime') && (
+            {type === 'fields' && fieldType === 'time' && (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="timeValue"
+                  stroke="#7B68EE"
+                  strokeWidth={3}
+                  name="Time"
+                  dot={{ r: 5 }}
+                />
+              </>
+            )}
+
+            {type === 'fields' && (fieldType === 'text' || fieldType === 'date' || fieldType === 'datetime') && (
               <>
                 <Line
                   type="monotone"
@@ -241,10 +345,10 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
             )}
           </LineChart>
         ) : (
-          <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <BarChart data={barChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis
-              dataKey="date"
+              dataKey={type === 'fields' && (fieldType === 'number' || fieldType === 'currency') ? 'metric' : 'date'}
               stroke="var(--text-secondary)"
               style={{ fontSize: '0.875rem' }}
             />
@@ -270,18 +374,13 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
               </>
             )}
 
-            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && chartData.length > 0 && (
-              <>
-                {chartData[0].value !== undefined && chartData[0].value !== null && (
-                  <Bar dataKey="value" fill="#7B68EE" name="Value" />
-                )}
-                {chartData[0].avg !== undefined && chartData[0].avg !== null && (
-                  <Bar dataKey="avg" fill="#2196F3" name="Average" />
-                )}
-                {chartData[0].sum !== undefined && chartData[0].sum !== null && (
-                  <Bar dataKey="sum" fill="#4CAF50" name="Sum" />
-                )}
-              </>
+            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && barChartData.length > 0 && (
+              <Bar dataKey="value" fill="#7B68EE" name="Value">
+                {barChartData.map((entry, index) => {
+                  const colors = ['#7B68EE', '#2196F3', '#4CAF50', '#FF9800', '#E91E63'];
+                  return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                })}
+              </Bar>
             )}
 
             {type === 'fields' && (fieldType === 'text' || fieldType === 'date' || fieldType === 'time' || fieldType === 'datetime') && (
