@@ -75,14 +75,72 @@ function StatisticsTable({ type, summary }) {
             </>
           )}
 
-          {type === 'fields' && (
+          {type === 'fields' && summary.trend === 'boolean' && (
+            <>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>Total True Count</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--success-color)' }}>
+                  {summary.overall_true_count || 0}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>Total False Count</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--error-color)' }}>
+                  {summary.overall_false_count || 0}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>True Percentage</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                  {summary.overall_true_percentage !== undefined && summary.overall_true_percentage !== null ? summary.overall_true_percentage.toFixed(1) : '0.0'}%
+                </td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.75rem' }}>Total Data Points</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.total_count || 0}
+                </td>
+              </tr>
+            </>
+          )}
+
+          {type === 'fields' && summary.trend === 'categorical' && (
+            <>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>Total Entries</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.total_count || 0}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>Unique Values</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                  {summary.unique_count || 0}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>Most Common Value</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--success-color)' }}>
+                  {summary.most_common_value || 'N/A'}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.75rem' }}>Most Common Count</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.most_common_count || 0}
+                </td>
+              </tr>
+            </>
+          )}
+
+          {type === 'fields' && summary.trend !== 'boolean' && summary.trend !== 'categorical' && (
             <>
               <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ padding: '0.75rem' }}>
                   Sum (Total) {summary.field_count > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>- combined across dates</span>}
                 </td>
                 <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1.1rem' }}>
-                  {summary.overall_sum !== null ? summary.overall_sum.toFixed(2) : 'N/A'}
+                  {summary.overall_sum !== undefined && summary.overall_sum !== null ? summary.overall_sum.toFixed(2) : 'N/A'}
                 </td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -90,7 +148,7 @@ function StatisticsTable({ type, summary }) {
                   Minimum {summary.field_count > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>- smallest value</span>}
                 </td>
                 <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
-                  {summary.overall_min !== null ? summary.overall_min.toFixed(2) : 'N/A'}
+                  {summary.overall_min !== undefined && summary.overall_min !== null ? summary.overall_min.toFixed(2) : 'N/A'}
                 </td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -98,7 +156,7 @@ function StatisticsTable({ type, summary }) {
                   Maximum {summary.field_count > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>- largest value</span>}
                 </td>
                 <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
-                  {summary.overall_max !== null ? summary.overall_max.toFixed(2) : 'N/A'}
+                  {summary.overall_max !== undefined && summary.overall_max !== null ? summary.overall_max.toFixed(2) : 'N/A'}
                 </td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -106,7 +164,7 @@ function StatisticsTable({ type, summary }) {
                   Average {summary.field_count > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>- across all values</span>}
                 </td>
                 <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
-                  {summary.overall_avg !== null ? summary.overall_avg.toFixed(2) : 'N/A'}
+                  {summary.overall_avg !== undefined && summary.overall_avg !== null ? summary.overall_avg.toFixed(2) : 'N/A'}
                 </td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -144,7 +202,7 @@ function StatisticsTable({ type, summary }) {
                          summary.change_percent < 0 ? 'var(--error-color)' :
                          'var(--text-secondary)'
                 }}>
-                  {summary.change_percent > 0 ? '+' : ''}{summary.change_percent.toFixed(1)}%
+                  {summary.change_percent !== undefined && summary.change_percent !== null ? `${summary.change_percent > 0 ? '+' : ''}${summary.change_percent.toFixed(1)}%` : 'N/A'}
                 </td>
               </tr>
             </>
