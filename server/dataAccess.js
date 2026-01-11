@@ -680,6 +680,23 @@ function queryTasks(userId, startDate, endDate, completionStatus, groupBy) {
   };
 }
 
+// Get all populated fields in a date range
+function getPopulatedFieldsInRange(userId, startDate, endDate) {
+  const fields = db.prepare(`
+    SELECT DISTINCT dcf.key, cft.field_type
+    FROM daily_custom_fields dcf
+    LEFT JOIN custom_field_templates cft ON dcf.user_id = cft.user_id AND dcf.key = cft.key
+    WHERE dcf.user_id = ? AND dcf.date >= ? AND dcf.date <= ?
+    AND dcf.value IS NOT NULL AND dcf.value != ''
+    ORDER BY dcf.key
+  `).all(userId, startDate, endDate);
+
+  return fields.map(f => ({
+    key: f.key,
+    fieldType: f.field_type || 'text'
+  }));
+}
+
 // Query field values for analytics
 function queryFieldValues(userId, fieldKey, startDate, endDate) {
   // Get field type from template
@@ -692,25 +709,46 @@ function queryFieldValues(userId, fieldKey, startDate, endDate) {
     throw new Error('Field template not found');
   }
 
-  if (template.field_type !== 'number' && template.field_type !== 'currency') {
-    throw new Error('Field must be of type "number" or "currency" for analytics');
-  }
+  const fieldType = template.field_type;
 
-  // Query field values
+  // Query field values based on type
   const values = db.prepare(`
-    SELECT date, value, created_at
+    SELECT date, value, created_at, field_type
     FROM daily_custom_fields
-    WHERE user_id = ? AND key = ? AND date >= ? AND date <= ? AND field_type IN ('number', 'currency')
+    WHERE user_id = ? AND key = ? AND date >= ? AND date <= ?
     ORDER BY date
   `).all(userId, fieldKey, startDate, endDate);
 
-  return values
-    .filter(v => v.value && v.value.trim() !== '')
-    .map(v => ({
-      date: v.date,
-      value: parseFloat(v.value),
-      created_at: v.created_at
-    }));
+  // Filter and transform based on field type
+  if (fieldType === 'number' || fieldType === 'currency') {
+    return values
+      .filter(v => v.value && v.value.trim() !== '')
+      .map(v => ({
+        date: v.date,
+        value: parseFloat(v.value),
+        created_at: v.created_at,
+        fieldType: v.field_type
+      }));
+  } else if (fieldType === 'boolean') {
+    return values
+      .filter(v => v.value && v.value.trim() !== '')
+      .map(v => ({
+        date: v.date,
+        value: v.value === 'true' || v.value === '1',
+        created_at: v.created_at,
+        fieldType: v.field_type
+      }));
+  } else {
+    // For text, date, time, datetime - just return raw values
+    return values
+      .filter(v => v.value && v.value.trim() !== '')
+      .map(v => ({
+        date: v.date,
+        value: v.value,
+        created_at: v.created_at,
+        fieldType: v.field_type
+      }));
+  }
 }
 
 // Helper: Group field values by period
@@ -755,25 +793,62 @@ function groupFieldValuesByPeriod(values, groupBy) {
 }
 
 // Calculate aggregations for field values
-function calculateFieldAggregations(values, groupBy) {
+function calculateFieldAggregations(values, groupBy, fieldType = 'number') {
   const grouped = groupFieldValuesByPeriod(values, groupBy);
 
   return grouped.map(group => {
     const vals = group.values;
-    return {
-      date: group.date,
-      value: group.value !== undefined ? group.value : null, // For ungrouped data
-      min: Math.min(...vals),
-      max: Math.max(...vals),
-      avg: vals.reduce((a, b) => a + b, 0) / vals.length,
-      sum: vals.reduce((a, b) => a + b, 0),
-      count: vals.length
-    };
+
+    if (fieldType === 'boolean') {
+      // For boolean fields, calculate true/false counts
+      const trueCount = vals.filter(v => v === true).length;
+      const falseCount = vals.filter(v => v === false).length;
+      const totalCount = vals.length;
+      const truePercentage = totalCount > 0 ? (trueCount / totalCount) * 100 : 0;
+
+      return {
+        date: group.date,
+        value: group.value !== undefined ? group.value : null,
+        trueCount,
+        falseCount,
+        totalCount,
+        truePercentage,
+        count: vals.length
+      };
+    } else if (fieldType === 'number' || fieldType === 'currency') {
+      // For numeric fields, calculate min/max/avg/sum
+      return {
+        date: group.date,
+        value: group.value !== undefined ? group.value : null,
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+        sum: vals.reduce((a, b) => a + b, 0),
+        count: vals.length
+      };
+    } else {
+      // For text, date, time, datetime - calculate counts and unique values
+      const uniqueValues = [...new Set(vals)];
+      const valueCounts = {};
+      vals.forEach(v => {
+        valueCounts[v] = (valueCounts[v] || 0) + 1;
+      });
+      const mostCommon = Object.entries(valueCounts).sort((a, b) => b[1] - a[1])[0];
+
+      return {
+        date: group.date,
+        value: group.value !== undefined ? group.value : null,
+        count: vals.length,
+        uniqueCount: uniqueValues.length,
+        mostCommonValue: mostCommon ? mostCommon[0] : null,
+        mostCommonCount: mostCommon ? mostCommon[1] : 0
+      };
+    }
   });
 }
 
 // Calculate summary statistics for field values
-function calculateFieldSummary(data) {
+function calculateFieldSummary(data, fieldType = 'number') {
   if (data.length === 0) {
     return {
       overall_min: null,
@@ -788,33 +863,70 @@ function calculateFieldSummary(data) {
 
   const allValues = data.flatMap(d => d.values || [d.value]).filter(v => v !== null && v !== undefined);
 
-  const summary = {
-    overall_min: Math.min(...allValues),
-    overall_max: Math.max(...allValues),
-    overall_avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
-    overall_sum: allValues.reduce((a, b) => a + b, 0),
-    total_count: allValues.length,
-    trend: 'unknown',
-    change_percent: 0
-  };
+  if (fieldType === 'boolean') {
+    // For boolean fields, calculate overall true/false counts
+    const overallTrueCount = allValues.filter(v => v === true).length;
+    const overallFalseCount = allValues.filter(v => v === false).length;
+    const totalCount = allValues.length;
+    const overallTruePercentage = totalCount > 0 ? (overallTrueCount / totalCount) * 100 : 0;
 
-  // Calculate trend
-  if (data.length >= 2) {
-    const firstValue = data[0].avg || data[0].value;
-    const lastValue = data[data.length - 1].avg || data[data.length - 1].value;
-
-    if (lastValue > firstValue) {
-      summary.trend = 'increasing';
-    } else if (lastValue < firstValue) {
-      summary.trend = 'decreasing';
-    } else {
-      summary.trend = 'stable';
-    }
-
-    summary.change_percent = firstValue !== 0 ? ((lastValue - firstValue) / firstValue) * 100 : 0;
+    return {
+      overall_true_count: overallTrueCount,
+      overall_false_count: overallFalseCount,
+      overall_true_percentage: overallTruePercentage,
+      total_count: totalCount,
+      trend: 'boolean',
+      change_percent: 0
+    };
   }
 
-  return summary;
+  if (fieldType === 'number' || fieldType === 'currency') {
+    // For numeric fields, calculate min/max/avg/sum
+    const summary = {
+      overall_min: Math.min(...allValues),
+      overall_max: Math.max(...allValues),
+      overall_avg: allValues.reduce((a, b) => a + b, 0) / allValues.length,
+      overall_sum: allValues.reduce((a, b) => a + b, 0),
+      total_count: allValues.length,
+      trend: 'unknown',
+      change_percent: 0
+    };
+
+    // Calculate trend
+    if (data.length >= 2) {
+      const firstValue = data[0].avg || data[0].value;
+      const lastValue = data[data.length - 1].avg || data[data.length - 1].value;
+
+      if (lastValue > firstValue) {
+        summary.trend = 'increasing';
+      } else if (lastValue < firstValue) {
+        summary.trend = 'decreasing';
+      } else {
+        summary.trend = 'stable';
+      }
+
+      summary.change_percent = firstValue !== 0 ? ((lastValue - firstValue) / firstValue) * 100 : 0;
+    }
+
+    return summary;
+  }
+
+  // For text, date, time, datetime - calculate unique counts
+  const uniqueValues = [...new Set(allValues)];
+  const valueCounts = {};
+  allValues.forEach(v => {
+    valueCounts[v] = (valueCounts[v] || 0) + 1;
+  });
+  const mostCommon = Object.entries(valueCounts).sort((a, b) => b[1] - a[1])[0];
+
+  return {
+    total_count: allValues.length,
+    unique_count: uniqueValues.length,
+    most_common_value: mostCommon ? mostCommon[0] : null,
+    most_common_count: mostCommon ? mostCommon[1] : 0,
+    trend: 'categorical',
+    change_percent: 0
+  };
 }
 
 // ============================================================================
@@ -954,6 +1066,7 @@ module.exports = {
   // Queries and Analytics
   queryTasks,
   queryFieldValues,
+  getPopulatedFieldsInRange,
   calculateFieldAggregations,
   calculateFieldSummary,
 

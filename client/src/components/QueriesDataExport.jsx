@@ -6,6 +6,7 @@ import ContributionCalendar from './ContributionCalendar';
 function QueriesDataExport({
   queryTasks,
   queryFields,
+  getPopulatedFields,
   exportCSV,
   getCustomFieldTemplates,
   // Snapshot props
@@ -29,7 +30,7 @@ function QueriesDataExport({
   const [selectedFields, setSelectedFields] = useState([]);
   const [completionStatus, setCompletionStatus] = useState('all');
   const [groupBy, setGroupBy] = useState('day');
-  const [numericFields, setNumericFields] = useState([]);
+  const [allFieldTypes, setAllFieldTypes] = useState([]);
 
   const [queryData, setQueryData] = useState(null);
   const [queryParams, setQueryParams] = useState(null);
@@ -94,10 +95,9 @@ function QueriesDataExport({
     const fetchTemplates = async () => {
       try {
         const templates = await getCustomFieldTemplates();
-        const numeric = templates.filter(t => t.field_type === 'number' || t.field_type === 'currency');
-        setNumericFields(numeric);
-        if (numeric.length > 0 && !selectedField && selectedFields.length === 0) {
-          setSelectedField(numeric[0].key);
+        setAllFieldTypes(templates);
+        if (templates.length > 0 && !selectedField && selectedFields.length === 0) {
+          setSelectedField(templates[0].key);
         }
       } catch (error) {
         console.error('Error fetching templates:', error);
@@ -136,15 +136,6 @@ function QueriesDataExport({
     }
   }, [startDate, endDate, shouldAutoSubmit]);
 
-  // Handle calendar date click
-  const handleCalendarDateClick = (dateStr) => {
-    setStartDate(dateStr);
-    setEndDate(dateStr);
-    setQueryType('snapshots'); // Switch to snapshots mode
-    setShouldAutoSubmit(true); // Trigger auto-submit
-    setShowCalendar(false); // Hide calendar after selection
-  };
-
   const handleRunQuery = async (e) => {
     e.preventDefault();
 
@@ -161,29 +152,8 @@ function QueriesDataExport({
       return;
     }
 
-    const daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-
-    // Date range limits based on query type and grouping
-    if (queryType === 'tasks') {
-      // Tasks limited to 1 year
-      if (daysDiff > 365) {
-        alert('Date range for tasks cannot exceed 1 year (365 days)');
-        return;
-      }
-    } else if (queryType === 'fields') {
-      // Fields have different limits based on grouping
-      if (groupBy === 'day' && daysDiff > 365) {
-        alert('Date range for daily grouping cannot exceed 1 year (365 days)');
-        return;
-      } else if (groupBy === 'week' && daysDiff > 364) {
-        alert('Date range for weekly grouping cannot exceed 52 weeks (364 days)');
-        return;
-      }
-      // Monthly and yearly grouping: no limit
-    }
-
     if (queryType === 'fields' && !selectedField && selectedFields.length === 0) {
-      alert('Please select at least one numeric field');
+      alert('Please select at least one field');
       return;
     }
 
@@ -196,7 +166,7 @@ function QueriesDataExport({
         params = { startDate, endDate, completionStatus, groupBy };
         result = await queryTasks(params);
       } else if (queryType === 'fields') {
-        // Support both single and multi-field queries
+        // Use selected fields
         const fieldKeys = selectedFields.length > 0 ? selectedFields : [selectedField];
         params = { fieldKeys, startDate, endDate, groupBy };
         result = await queryFields(params);
@@ -330,13 +300,41 @@ function QueriesDataExport({
           📅 Select Date Range
         </h3>
 
-        {/* Calendar */}
-        <ContributionCalendar
-          availableDates={availableDates || []}
-          formatDateDisplay={formatDateDisplay}
-          compact={true}
-          onDateClick={handleCalendarDateClick}
-        />
+        {/* Calendar Toggle */}
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => setShowCalendar(!showCalendar)}
+            className={`btn btn-sm ${showCalendar ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            📅 Calendar {showCalendar ? '▲' : '▼'}
+          </button>
+
+          {/* Expanding Calendar Section */}
+          {showCalendar && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              backgroundColor: 'var(--bg-secondary)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)'
+            }}>
+              <ContributionCalendar
+                availableDates={availableDates || []}
+                formatDateDisplay={formatDateDisplay}
+                compact={true}
+                enableRangeSelection={true}
+                onRangeSelect={(start, end) => {
+                  if (start && end) {
+                    setStartDate(start);
+                    setEndDate(end);
+                  }
+                }}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Date Range Inputs */}
         <div style={{ marginTop: '1rem' }}>
@@ -520,9 +518,6 @@ function QueriesDataExport({
                 <option value="month">By Month</option>
                 <option value="year">By Year</option>
               </select>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                ⏱️ Task queries limited to 1 year (365 days)
-              </p>
             </div>
           </div>
         )}
@@ -541,7 +536,7 @@ function QueriesDataExport({
                 maxHeight: '200px',
                 overflowY: 'auto'
               }}>
-                {numericFields.map(field => (
+                {allFieldTypes.map(field => (
                   <label key={field.id} style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -578,24 +573,18 @@ function QueriesDataExport({
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value)}
               >
-                <option value="day">By Day (max 365 days)</option>
-                <option value="week">By Week (max 52 weeks)</option>
-                <option value="month">By Month (unlimited)</option>
-                <option value="year">By Year (unlimited)</option>
+                <option value="day">By Day</option>
+                <option value="week">By Week</option>
+                <option value="month">By Month</option>
+                <option value="year">By Year</option>
               </select>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                {groupBy === 'day' && '⏱️ Daily view limited to 1 year for performance'}
-                {groupBy === 'week' && '⏱️ Weekly view limited to 52 weeks for performance'}
-                {groupBy === 'month' && '✨ No date range limit - perfect for long-term tracking'}
-                {groupBy === 'year' && '✨ No date range limit - ideal for multi-year analysis'}
-              </p>
             </div>
           </>
         )}
 
-        {queryType === 'fields' && numericFields.length === 0 && (
+        {queryType === 'fields' && allFieldTypes.length === 0 && (
           <div className="empty-state" style={{ marginTop: '1rem' }}>
-            No numeric fields found. Create a numeric template field on the Home page first.
+            No custom fields found. Create a custom field template on the Home page first.
           </div>
         )}
 
@@ -710,6 +699,7 @@ function QueriesDataExport({
                         type={queryType}
                         chartType={chartType}
                         data={queryData.combined.data}
+                        fieldType={queryData.fields && queryData.fields.length > 0 ? queryData.fields[0].fieldType : 'number'}
                       />
                       <StatisticsTable type={queryType} summary={queryData.combined.summary} />
                     </>
@@ -744,6 +734,7 @@ function QueriesDataExport({
                       type={queryType}
                       chartType={chartType}
                       data={queryData.data}
+                      fieldType={queryData.fieldType || 'number'}
                     />
                   ) : (
                     <div style={{
@@ -790,15 +781,6 @@ function QueriesDataExport({
                 📋 View All Snapshots
               </button>
             )}
-          </div>
-          
-          {/* Calendar View */}
-          <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
-            <h4 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>📅 Contribution Calendar</h4>
-            <ContributionCalendar 
-              availableDates={availableDates}
-              formatDateDisplay={formatDateDisplay}
-            />
           </div>
           
           {/* List View */}

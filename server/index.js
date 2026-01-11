@@ -2695,25 +2695,38 @@ app.put('/api/custom-fields/:key', authMiddleware, (req, res) => {
 // QUERIES AND DATA EXPORT ENDPOINTS
 // ============================================================================
 
+// Get all populated fields in a date range
+app.post('/api/queries/populated-fields', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { startDate, endDate } = req.body;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date required' });
+  }
+
+  try {
+    const fields = dataAccess.getPopulatedFieldsInRange(userId, startDate, endDate);
+    res.json({ fields });
+  } catch (error) {
+    console.error('Error getting populated fields:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Query tasks with filters
 app.post('/api/queries/tasks', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const { startDate, endDate, completionStatus, groupBy } = req.body;
 
-  // Validate date range (max 1 year)
+  // Validate date range
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'Start date and end date required' });
   }
 
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
 
-  if (daysDiff > 365) {
-    return res.status(400).json({ error: 'Date range cannot exceed 1 year' });
-  }
-
-  if (daysDiff < 0) {
+  if (end < start) {
     return res.status(400).json({ error: 'End date must be after start date' });
   }
 
@@ -2750,16 +2763,11 @@ app.post('/api/queries/fields', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'Start date and end date required' });
   }
 
-  // Validate date range (max 1 year)
+  // Validate date range
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
 
-  if (daysDiff > 365) {
-    return res.status(400).json({ error: 'Date range cannot exceed 1 year' });
-  }
-
-  if (daysDiff < 0) {
+  if (end < start) {
     return res.status(400).json({ error: 'End date must be after start date' });
   }
 
@@ -2772,9 +2780,13 @@ app.post('/api/queries/fields', authMiddleware, (req, res) => {
         const values = dataAccess.queryFieldValues(userId, key, startDate, endDate);
         console.log(`Field "${key}" returned ${values.length} values`);
 
+        // Get field type from first value if available
+        const fieldType = values.length > 0 && values[0].fieldType ? values[0].fieldType : 'number';
+
         if (values.length === 0) {
           return {
             fieldKey: key,
+            fieldType,
             data: [],
             summary: {
               overall_min: null,
@@ -2788,11 +2800,12 @@ app.post('/api/queries/fields', authMiddleware, (req, res) => {
           };
         }
 
-        const aggregatedData = dataAccess.calculateFieldAggregations(values, groupBy || 'day');
-        const summary = dataAccess.calculateFieldSummary(values);
+        const aggregatedData = dataAccess.calculateFieldAggregations(values, groupBy || 'day', fieldType);
+        const summary = dataAccess.calculateFieldSummary(values, fieldType);
 
         return {
           fieldKey: key,
+          fieldType,
           data: aggregatedData,
           summary
         };

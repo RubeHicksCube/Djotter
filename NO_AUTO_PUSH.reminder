@@ -1,0 +1,10 @@
+# NEVER AUTO-PUSH TO GITHUB
+# This file serves as a reminder to never automatically push changes
+# User must explicitly authorize pushes with specific command
+
+REMINDER:
+- Do NOT use git push automatically
+- Always ask user before pushing
+- Use "git status" to show changes
+- Use "git add" and "git commit" to prepare changes
+- WAIT for user approval before "git push"

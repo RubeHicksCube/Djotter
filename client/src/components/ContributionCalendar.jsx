@@ -1,8 +1,53 @@
 import React, { useState } from 'react';
-import { format, startOfYear, endOfYear, eachDayOfInterval, getDay, subYears, addYears } from 'date-fns';
+import { format, startOfYear, endOfYear, eachDayOfInterval, getDay, subYears, addYears, parseISO, isWithinInterval } from 'date-fns';
 
-function ContributionCalendar({ availableDates, formatDateDisplay, compact = false, onDateClick }) {
+function ContributionCalendar({ availableDates, formatDateDisplay, compact = false, onDateClick, enableRangeSelection = false, onRangeSelect }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [rangeStart, setRangeStart] = useState(null);
+  const [rangeEnd, setRangeEnd] = useState(null);
+  const [isSelectingRange, setIsSelectingRange] = useState(false);
+
+  // Handle date click for range selection
+  const handleDateClickInternal = (dateStr) => {
+    if (enableRangeSelection) {
+      if (!rangeStart || (rangeStart && rangeEnd)) {
+        // Start new range selection
+        setRangeStart(dateStr);
+        setRangeEnd(null);
+        setIsSelectingRange(true);
+      } else {
+        // Complete range selection
+        const start = new Date(rangeStart);
+        const end = new Date(dateStr);
+
+        if (end < start) {
+          // Swap if end is before start
+          setRangeStart(dateStr);
+          setRangeEnd(rangeStart);
+          if (onRangeSelect) {
+            onRangeSelect(dateStr, rangeStart);
+          }
+        } else {
+          setRangeEnd(dateStr);
+          if (onRangeSelect) {
+            onRangeSelect(rangeStart, dateStr);
+          }
+        }
+        setIsSelectingRange(false);
+      }
+    } else if (onDateClick) {
+      onDateClick(dateStr);
+    }
+  };
+
+  // Check if a date is within the selected range
+  const isInRange = (dateStr) => {
+    if (!rangeStart || !rangeEnd) return false;
+    const date = parseISO(dateStr);
+    const start = parseISO(rangeStart);
+    const end = parseISO(rangeEnd);
+    return isWithinInterval(date, { start, end });
+  };
 
   // Get activity level for a given date (0-4 scale like GitHub)
   const getActivityLevel = (dateStr) => {
@@ -112,6 +157,46 @@ function ContributionCalendar({ availableDates, formatDateDisplay, compact = fal
         </h4>
       </div>
 
+      {/* Range Selection Info */}
+      {enableRangeSelection && (rangeStart || rangeEnd) && (
+        <div style={{
+          marginBottom: compact ? '0.5rem' : '1rem',
+          padding: compact ? '0.3rem' : '0.5rem',
+          backgroundColor: 'var(--bg-secondary)',
+          borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: compact ? '0.6rem' : '0.75rem'
+        }}>
+          <div>
+            {rangeStart && !rangeEnd && (
+              <span>Click to select end date (Start: {rangeStart})</span>
+            )}
+            {rangeStart && rangeEnd && (
+              <span>Selected range: {rangeStart} to {rangeEnd}</span>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setRangeStart(null);
+              setRangeEnd(null);
+              setIsSelectingRange(false);
+              if (onRangeSelect) {
+                onRangeSelect(null, null);
+              }
+            }}
+            className="btn btn-secondary"
+            style={{
+              padding: compact ? '0.15rem 0.3rem' : '0.25rem 0.5rem',
+              fontSize: compact ? '0.6rem' : '0.75rem'
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Calendar grid */}
       <div style={{ display: 'flex', alignItems: 'flex-start' }}>
         {/* Weekday labels */}
@@ -152,6 +237,10 @@ function ContributionCalendar({ availableDates, formatDateDisplay, compact = fal
                   );
                 }
 
+                const isStartDate = enableRangeSelection && day.dateStr === rangeStart;
+                const isEndDate = enableRangeSelection && day.dateStr === rangeEnd;
+                const inRange = enableRangeSelection && isInRange(day.dateStr);
+
                 return (
                   <div
                     key={day.dateStr}
@@ -159,29 +248,46 @@ function ContributionCalendar({ availableDates, formatDateDisplay, compact = fal
                       width: squareSize,
                       height: squareSize,
                       borderRadius: '2px',
-                      backgroundColor: getActivityColor(day.activityLevel),
-                      border: '1px solid var(--border-color)',
+                      backgroundColor: isStartDate || isEndDate
+                        ? 'var(--primary-color)'
+                        : inRange
+                          ? 'rgba(59, 130, 246, 0.3)'
+                          : getActivityColor(day.activityLevel),
+                      border: isStartDate || isEndDate
+                        ? '2px solid var(--primary-dark)'
+                        : '1px solid var(--border-color)',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      position: 'relative'
                     }}
-                    title={`${day.dateStr}${day.activityLevel > 0 ? ' - has snapshot' : ' - click to filter'}`}
+                    title={
+                      enableRangeSelection
+                        ? isStartDate
+                          ? `Start: ${day.dateStr}`
+                          : isEndDate
+                            ? `End: ${day.dateStr}`
+                            : `${day.dateStr}${day.activityLevel > 0 ? ' - has snapshot' : ''}`
+                        : `${day.dateStr}${day.activityLevel > 0 ? ' - has snapshot' : ' - click to filter'}`
+                    }
                     onMouseEnter={(e) => {
-                      e.target.style.transform = 'scale(1.2)';
-                      e.target.style.borderColor = 'var(--primary-color)';
-                      if (day.activityLevel === 0) {
-                        e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                      if (!isStartDate && !isEndDate) {
+                        e.target.style.transform = 'scale(1.2)';
+                        e.target.style.borderColor = 'var(--primary-color)';
+                        if (day.activityLevel === 0 && !inRange) {
+                          e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                        }
                       }
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.transform = 'scale(1)';
-                      e.target.style.borderColor = 'var(--border-color)';
-                      e.target.style.backgroundColor = getActivityColor(day.activityLevel);
-                    }}
-                    onClick={() => {
-                      if (onDateClick) {
-                        onDateClick(day.dateStr);
+                      if (!isStartDate && !isEndDate) {
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.borderColor = 'var(--border-color)';
+                        e.target.style.backgroundColor = inRange
+                          ? 'rgba(59, 130, 246, 0.3)'
+                          : getActivityColor(day.activityLevel);
                       }
                     }}
+                    onClick={() => handleDateClickInternal(day.dateStr)}
                   />
                 );
               })}

@@ -701,6 +701,19 @@ export const api = {
     return response.json();
   },
 
+  getPopulatedFields: async (startDate, endDate) => {
+    const response = await fetch(`${API_BASE}/queries/populated-fields`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ startDate, endDate })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get populated fields');
+    }
+    return response.json();
+  },
+
   exportCSV: async (type, queryParams) => {
     const response = await fetch(`${API_BASE}/exports/csv`, {
       method: 'POST',

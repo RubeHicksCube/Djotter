@@ -9,10 +9,13 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  Cell
 } from 'recharts';
 
-function DataChart({ type, chartType, data, dataKey, label }) {
+function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
   if (!data || data.length === 0) {
     return (
       <div style={{
@@ -39,15 +42,35 @@ function DataChart({ type, chartType, data, dataKey, label }) {
 
   // Transform data for fields
   if (type === 'fields') {
-    chartData = data.map(item => ({
-      date: item.date,
-      value: item.value !== undefined ? parseFloat(item.value.toFixed(2)) : null,
-      min: item.min !== undefined ? parseFloat(item.min.toFixed(2)) : null,
-      max: item.max !== undefined ? parseFloat(item.max.toFixed(2)) : null,
-      avg: item.avg !== undefined ? parseFloat(item.avg.toFixed(2)) : null,
-      sum: item.sum !== undefined ? parseFloat(item.sum.toFixed(2)) : null,
-      count: item.count
-    }));
+    if (fieldType === 'boolean') {
+      chartData = data.map(item => ({
+        date: item.date,
+        value: item.value !== undefined && item.value !== null ? (item.value ? 1 : 0) : null,
+        trueCount: item.trueCount || 0,
+        falseCount: item.falseCount || 0,
+        totalCount: item.totalCount || 0,
+        truePercentage: item.truePercentage !== undefined ? parseFloat(item.truePercentage.toFixed(1)) : null
+      }));
+    } else if (fieldType === 'number' || fieldType === 'currency') {
+      chartData = data.map(item => ({
+        date: item.date,
+        value: item.value !== undefined ? parseFloat(item.value.toFixed(2)) : null,
+        min: item.min !== undefined ? parseFloat(item.min.toFixed(2)) : null,
+        max: item.max !== undefined ? parseFloat(item.max.toFixed(2)) : null,
+        avg: item.avg !== undefined ? parseFloat(item.avg.toFixed(2)) : null,
+        sum: item.sum !== undefined ? parseFloat(item.sum.toFixed(2)) : null,
+        count: item.count
+      }));
+    } else {
+      // For text, date, time, datetime - show count and unique count
+      chartData = data.map(item => ({
+        date: item.date,
+        count: item.count || 0,
+        uniqueCount: item.uniqueCount || 0,
+        mostCommonValue: item.mostCommonValue || '',
+        mostCommonCount: item.mostCommonCount || 0
+      }));
+    }
   }
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -125,7 +148,31 @@ function DataChart({ type, chartType, data, dataKey, label }) {
               </>
             )}
 
-            {type === 'fields' && (
+            {type === 'fields' && fieldType === 'boolean' && (
+              <>
+                <Line
+                  type="stepAfter"
+                  dataKey="value"
+                  stroke="#7B68EE"
+                  strokeWidth={3}
+                  name="Value (1=true, 0=false)"
+                  dot={{ r: 6 }}
+                />
+                {chartData[0].truePercentage !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="truePercentage"
+                    stroke="#4CAF50"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="True %"
+                    dot={{ r: 4 }}
+                  />
+                )}
+              </>
+            )}
+
+            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && (
               <>
                 {chartData[0].value !== null && (
                   <Line
@@ -171,6 +218,27 @@ function DataChart({ type, chartType, data, dataKey, label }) {
                 )}
               </>
             )}
+
+            {type === 'fields' && (fieldType === 'text' || fieldType === 'date' || fieldType === 'time' || fieldType === 'datetime') && (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#7B68EE"
+                  strokeWidth={2}
+                  name="Total Entries"
+                  dot={{ r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="uniqueCount"
+                  stroke="#4CAF50"
+                  strokeWidth={2}
+                  name="Unique Values"
+                  dot={{ r: 4 }}
+                />
+              </>
+            )}
           </LineChart>
         ) : (
           <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -195,7 +263,14 @@ function DataChart({ type, chartType, data, dataKey, label }) {
               </>
             )}
 
-            {type === 'fields' && (
+            {type === 'fields' && fieldType === 'boolean' && (
+              <>
+                <Bar dataKey="trueCount" fill="#4CAF50" name="True Count" />
+                <Bar dataKey="falseCount" fill="#FF9800" name="False Count" />
+              </>
+            )}
+
+            {type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && (
               <>
                 {chartData[0].value !== null && (
                   <Bar dataKey="value" fill="#7B68EE" name="Value" />
@@ -206,6 +281,13 @@ function DataChart({ type, chartType, data, dataKey, label }) {
                 {chartData[0].sum !== null && (
                   <Bar dataKey="sum" fill="#4CAF50" name="Sum" />
                 )}
+              </>
+            )}
+
+            {type === 'fields' && (fieldType === 'text' || fieldType === 'date' || fieldType === 'time' || fieldType === 'datetime') && (
+              <>
+                <Bar dataKey="count" fill="#7B68EE" name="Total Entries" />
+                <Bar dataKey="uniqueCount" fill="#4CAF50" name="Unique Values" />
               </>
             )}
           </BarChart>
