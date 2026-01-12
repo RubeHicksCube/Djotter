@@ -3,7 +3,6 @@ import { api } from '../services/api';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useUserSettings } from '../contexts/UserSettingsContext';
-import { PeekingOtterTop, PeekingOtterSide } from '../components/OtterDecorations';
 import {
   DndContext,
   closestCenter,
@@ -447,10 +446,8 @@ const calculateDaysSince = (date) => {
 
   return (
     <div className="container" style={{ position: 'relative' }}>
-      <PeekingOtterSide side="left" />
       <header>
         <div className="date-header" style={{ position: 'relative', overflow: 'visible' }}>
-          <PeekingOtterTop />
           <h1 className="date-large">{formatDate(state.date, settings.timezone)}</h1>
           <p className="time-large">{formatInTimeZone(currentTime, settings.timezone, 'HH:mm:ss')}</p>
         </div>

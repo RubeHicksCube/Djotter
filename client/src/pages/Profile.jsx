@@ -4,7 +4,6 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { api } from '../services/api';
 import { formatLogTime } from '../utils/timezone';
 import { useUserSettings } from '../contexts/UserSettingsContext';
-import { PeekingOtterTop, PeekingOtterSide } from '../components/OtterDecorations';
 
 import QueriesDataExport from '../components/QueriesDataExport';
 
@@ -583,13 +582,11 @@ export default function Profile() {
 
   return (
     <div className="container" style={{ position: 'relative' }}>
-      <PeekingOtterSide side="right" />
       <header>
         <div className="date-header" style={{ position: 'relative', overflow: 'visible' }}>
-          <PeekingOtterTop />
           <h1 className="date-large">User Profile</h1>
         </div>
-        
+
 
       </header>
 
