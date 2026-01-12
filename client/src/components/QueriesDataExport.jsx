@@ -438,7 +438,7 @@ function QueriesDataExport({
               gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
               gap: '0.5rem'
             }}>
-              {availableDates.slice().reverse().slice(0, 3).map(date => (
+              {availableDates.slice(0, 3).map(date => (
                 <button
                   key={date}
                   onClick={() => {
@@ -967,7 +967,7 @@ function QueriesDataExport({
           {/* List View */}
           <div className="dates-list" style={{ marginTop: '1rem' }}>
             <h4 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>📋 List View (Last 3)</h4>
-            {availableDates.slice().reverse().slice(0, 3).map(date => (
+            {availableDates.slice(0, 3).map(date => (
               <div key={date} className="date-item">
                 <span className="date-badge">📅 {formatDateDisplay(date)}</span>
                 <div className="date-actions">
