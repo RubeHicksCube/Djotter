@@ -848,7 +848,11 @@ export default function Profile() {
           <QueriesDataExport
             queryTasks={api.queryTasks}
             queryFields={api.queryFields}
+            queryCounters={api.queryCounters}
+            queryTimers={api.queryTimers}
             getPopulatedFields={api.getPopulatedFields}
+            getPopulatedCounters={api.getPopulatedCounters}
+            getPopulatedTimers={api.getPopulatedTimers}
             exportCSV={api.exportCSV}
             getCustomFieldTemplates={api.getCustomFieldTemplates}
             availableDates={availableDates}

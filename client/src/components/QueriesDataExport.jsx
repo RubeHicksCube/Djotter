@@ -6,7 +6,11 @@ import ContributionCalendar from './ContributionCalendar';
 function QueriesDataExport({
   queryTasks,
   queryFields,
+  queryCounters,
+  queryTimers,
   getPopulatedFields,
+  getPopulatedCounters,
+  getPopulatedTimers,
   exportCSV,
   getCustomFieldTemplates,
   // Snapshot props
@@ -28,9 +32,13 @@ function QueriesDataExport({
   const [queryType, setQueryType] = useState('tasks');
   const [selectedField, setSelectedField] = useState('');
   const [selectedFields, setSelectedFields] = useState([]);
+  const [selectedCounters, setSelectedCounters] = useState([]);
+  const [selectedTimers, setSelectedTimers] = useState([]);
   const [completionStatus, setCompletionStatus] = useState('all');
   const [groupBy, setGroupBy] = useState('day');
   const [allFieldTypes, setAllFieldTypes] = useState([]);
+  const [allCounters, setAllCounters] = useState([]);
+  const [allTimers, setAllTimers] = useState([]);
 
   const [queryData, setQueryData] = useState(null);
   const [queryParams, setQueryParams] = useState(null);
@@ -107,6 +115,27 @@ function QueriesDataExport({
     fetchTemplates();
   }, [getCustomFieldTemplates]);
 
+  // Fetch populated trackers when date range changes
+  useEffect(() => {
+    const fetchTrackers = async () => {
+      if (!startDate || !endDate) return;
+
+      try {
+        if (queryType === 'counters') {
+          const result = await getPopulatedCounters(startDate, endDate);
+          setAllCounters(result.counters || []);
+        } else if (queryType === 'timers') {
+          const result = await getPopulatedTimers(startDate, endDate);
+          setAllTimers(result.timers || []);
+        }
+      } catch (error) {
+        console.error('Error fetching trackers:', error);
+      }
+    };
+
+    fetchTrackers();
+  }, [startDate, endDate, queryType, getPopulatedCounters, getPopulatedTimers]);
+
   // Modal body handling with pointer events control
   useEffect(() => {
     if (showSnapshotModal) {
@@ -157,6 +186,16 @@ function QueriesDataExport({
       return;
     }
 
+    if (queryType === 'counters' && selectedCounters.length === 0) {
+      alert('Please select at least one counter');
+      return;
+    }
+
+    if (queryType === 'timers' && selectedTimers.length === 0) {
+      alert('Please select at least one timer');
+      return;
+    }
+
     setIsLoading(true);
     try {
       let result;
@@ -170,6 +209,12 @@ function QueriesDataExport({
         const fieldKeys = selectedFields.length > 0 ? selectedFields : [selectedField];
         params = { fieldKeys, startDate, endDate, groupBy };
         result = await queryFields(params);
+      } else if (queryType === 'counters') {
+        params = { counterNames: selectedCounters, startDate, endDate, groupBy };
+        result = await queryCounters(params);
+      } else if (queryType === 'timers') {
+        params = { timerNames: selectedTimers, startDate, endDate, groupBy };
+        result = await queryTimers(params);
       }
 
       setQueryData(result);
@@ -260,6 +305,8 @@ function QueriesDataExport({
       ? queryData.combined.summary.field_count
       : (queryData.summary && queryData.summary.total_count) || 0
   ) : 0;
+  const counterCount = queryData && queryType === 'counters' && queryData.summary ? queryData.summary.total_count : 0;
+  const timerCount = queryData && queryType === 'timers' && queryData.summary ? queryData.summary.total_count : 0;
 
   // Filter available dates based on search
   const filteredDates = availableDates ? availableDates.filter(date => {
@@ -487,6 +534,8 @@ function QueriesDataExport({
           >
             <option value="tasks">Tasks</option>
             <option value="fields">Fields</option>
+            <option value="counters">Counters</option>
+            <option value="timers">Timers</option>
           </select>
         </div>
 
@@ -586,6 +635,138 @@ function QueriesDataExport({
           <div className="empty-state" style={{ marginTop: '1rem' }}>
             No custom fields found. Create a custom field template on the Home page first.
           </div>
+        )}
+
+        {queryType === 'counters' && (
+          <>
+            <div style={{ marginTop: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Select Counters to Analyze
+              </label>
+              <div style={{
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                backgroundColor: 'var(--bg-secondary)',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                {allCounters.length > 0 ? (
+                  allCounters.map((counter, index) => (
+                    <label key={index} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      marginBottom: '0.5rem',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCounters.includes(counter.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCounters([...selectedCounters, counter.name]);
+                          } else {
+                            setSelectedCounters(selectedCounters.filter(n => n !== counter.name));
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>{counter.name}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    No counters found in the selected date range. Adjust dates or create counters on the Trackers page.
+                  </p>
+                )}
+              </div>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                {selectedCounters.length === 0 ? 'No counters selected' :
+                 selectedCounters.length === 1 ? '1 counter selected' :
+                 `${selectedCounters.length} counters selected`}
+              </p>
+            </div>
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+              <label>Group By</label>
+              <select
+                className="form-input"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+              >
+                <option value="day">By Day</option>
+                <option value="week">By Week</option>
+                <option value="month">By Month</option>
+                <option value="year">By Year</option>
+              </select>
+            </div>
+          </>
+        )}
+
+        {queryType === 'timers' && (
+          <>
+            <div style={{ marginTop: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Select Timers to Analyze
+              </label>
+              <div style={{
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                backgroundColor: 'var(--bg-secondary)',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                {allTimers.length > 0 ? (
+                  allTimers.map((timer, index) => (
+                    <label key={index} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      marginBottom: '0.5rem',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedTimers.includes(timer.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTimers([...selectedTimers, timer.name]);
+                          } else {
+                            setSelectedTimers(selectedTimers.filter(n => n !== timer.name));
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>{timer.name}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    No timers found in the selected date range. Adjust dates or create timers on the Trackers page.
+                  </p>
+                )}
+              </div>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                {selectedTimers.length === 0 ? 'No timers selected' :
+                 selectedTimers.length === 1 ? '1 timer selected' :
+                 `${selectedTimers.length} timers selected`}
+              </p>
+            </div>
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+              <label>Group By</label>
+              <select
+                className="form-input"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+              >
+                <option value="day">By Day</option>
+                <option value="week">By Week</option>
+                <option value="month">By Month</option>
+                <option value="year">By Year</option>
+              </select>
+            </div>
+          </>
         )}
 
         {/* Action Buttons */}
@@ -830,6 +1011,8 @@ function QueriesDataExport({
           <strong>
             {queryType === 'tasks' && `Total: ${taskCount} tasks`}
             {queryType === 'fields' && `Total: ${fieldCount} values`}
+            {queryType === 'counters' && `Total: ${counterCount} data points`}
+            {queryType === 'timers' && `Total: ${timerCount} data points (minutes)`}
           </strong>
         </div>
       )}

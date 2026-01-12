@@ -714,6 +714,58 @@ export const api = {
     return response.json();
   },
 
+  queryCounters: async (params) => {
+    const response = await fetch(`${API_BASE}/queries/counters`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to query counters');
+    }
+    return response.json();
+  },
+
+  queryTimers: async (params) => {
+    const response = await fetch(`${API_BASE}/queries/timers`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to query timers');
+    }
+    return response.json();
+  },
+
+  getPopulatedCounters: async (startDate, endDate) => {
+    const response = await fetch(`${API_BASE}/queries/populated-counters`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ startDate, endDate })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get populated counters');
+    }
+    return response.json();
+  },
+
+  getPopulatedTimers: async (startDate, endDate) => {
+    const response = await fetch(`${API_BASE}/queries/populated-timers`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ startDate, endDate })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get populated timers');
+    }
+    return response.json();
+  },
+
   exportCSV: async (type, queryParams) => {
     const response = await fetch(`${API_BASE}/exports/csv`, {
       method: 'POST',

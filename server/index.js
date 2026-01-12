@@ -2902,6 +2902,188 @@ app.post('/api/queries/fields', authMiddleware, (req, res) => {
   }
 });
 
+// Get populated counters in date range
+app.post('/api/queries/populated-counters', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { startDate, endDate } = req.body;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date required' });
+  }
+
+  try {
+    const counters = dataAccess.getPopulatedCountersInRange(userId, startDate, endDate);
+    res.json({ counters });
+  } catch (error) {
+    console.error('Error getting populated counters:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get populated timers in date range
+app.post('/api/queries/populated-timers', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { startDate, endDate } = req.body;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date required' });
+  }
+
+  try {
+    const timers = dataAccess.getPopulatedTimersInRange(userId, startDate, endDate);
+    res.json({ timers });
+  } catch (error) {
+    console.error('Error getting populated timers:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Query counters
+app.post('/api/queries/counters', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { counterName, counterNames, startDate, endDate, groupBy } = req.body;
+
+  // Support both single counter and multiple counters
+  const namesToQuery = counterNames || (counterName ? [counterName] : []);
+
+  // Validate inputs
+  if (!namesToQuery || namesToQuery.length === 0) {
+    return res.status(400).json({ error: 'At least one counter name is required' });
+  }
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date required' });
+  }
+
+  // Validate date range
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (end < start) {
+    return res.status(400).json({ error: 'End date must be after start date' });
+  }
+
+  try {
+    // Query all counters
+    const countersData = namesToQuery.map(name => {
+      try {
+        const values = dataAccess.queryCounterValues(userId, name, startDate, endDate);
+
+        if (values.length === 0) {
+          return {
+            counterName: name,
+            data: [],
+            summary: dataAccess.calculateTrackerSummary([])
+          };
+        }
+
+        const aggregatedData = dataAccess.calculateTrackerAggregations(values, groupBy || 'day');
+        const summary = dataAccess.calculateTrackerSummary(values);
+
+        return {
+          counterName: name,
+          data: aggregatedData,
+          summary
+        };
+      } catch (err) {
+        console.error(`Error querying counter "${name}":`, err);
+        return {
+          counterName: name,
+          error: err.message,
+          data: [],
+          summary: null
+        };
+      }
+    });
+
+    // For single counter, return old format
+    if (namesToQuery.length === 1) {
+      res.json(countersData[0]);
+    } else {
+      res.json({
+        counters: countersData,
+        counterNames: namesToQuery
+      });
+    }
+  } catch (error) {
+    console.error('Error querying counters:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Query timers
+app.post('/api/queries/timers', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { timerName, timerNames, startDate, endDate, groupBy } = req.body;
+
+  // Support both single timer and multiple timers
+  const namesToQuery = timerNames || (timerName ? [timerName] : []);
+
+  // Validate inputs
+  if (!namesToQuery || namesToQuery.length === 0) {
+    return res.status(400).json({ error: 'At least one timer name is required' });
+  }
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date required' });
+  }
+
+  // Validate date range
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (end < start) {
+    return res.status(400).json({ error: 'End date must be after start date' });
+  }
+
+  try {
+    // Query all timers
+    const timersData = namesToQuery.map(name => {
+      try {
+        const values = dataAccess.queryTimerValues(userId, name, startDate, endDate);
+
+        if (values.length === 0) {
+          return {
+            timerName: name,
+            data: [],
+            summary: dataAccess.calculateTrackerSummary([])
+          };
+        }
+
+        const aggregatedData = dataAccess.calculateTrackerAggregations(values, groupBy || 'day');
+        const summary = dataAccess.calculateTrackerSummary(values);
+
+        return {
+          timerName: name,
+          data: aggregatedData,
+          summary
+        };
+      } catch (err) {
+        console.error(`Error querying timer "${name}":`, err);
+        return {
+          timerName: name,
+          error: err.message,
+          data: [],
+          summary: null
+        };
+      }
+    });
+
+    // For single timer, return old format
+    if (namesToQuery.length === 1) {
+      res.json(timersData[0]);
+    } else {
+      res.json({
+        timers: timersData,
+        timerNames: namesToQuery
+      });
+    }
+  } catch (error) {
+    console.error('Error querying timers:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Export query results to CSV
 app.post('/api/exports/csv', authMiddleware, async (req, res) => {
   const userId = req.user.id;

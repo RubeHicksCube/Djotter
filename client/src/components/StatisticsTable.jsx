@@ -207,6 +207,85 @@ function StatisticsTable({ type, summary }) {
               </tr>
             </>
           )}
+
+          {(type === 'counters' || type === 'timers') && (
+            <>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>
+                  Sum (Total)
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1.1rem' }}>
+                  {summary.overall_sum !== undefined && summary.overall_sum !== null ? summary.overall_sum.toFixed(2) : 'N/A'}
+                  {type === 'timers' && summary.overall_sum !== undefined && summary.overall_sum !== null && ' min'}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>
+                  Minimum
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.overall_min !== undefined && summary.overall_min !== null ? summary.overall_min.toFixed(2) : 'N/A'}
+                  {type === 'timers' && summary.overall_min !== undefined && summary.overall_min !== null && ' min'}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>
+                  Maximum
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.overall_max !== undefined && summary.overall_max !== null ? summary.overall_max.toFixed(2) : 'N/A'}
+                  {type === 'timers' && summary.overall_max !== undefined && summary.overall_max !== null && ' min'}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>
+                  Average
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.overall_avg !== undefined && summary.overall_avg !== null ? summary.overall_avg.toFixed(2) : 'N/A'}
+                  {type === 'timers' && summary.overall_avg !== undefined && summary.overall_avg !== null && ' min'}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>
+                  Data Points
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                  {summary.total_count}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '0.75rem' }}>
+                  Trend
+                </td>
+                <td style={{
+                  padding: '0.75rem',
+                  textAlign: 'right',
+                  fontWeight: 'bold',
+                  color: summary.trend === 'increasing' ? 'var(--success-color)' :
+                         summary.trend === 'decreasing' ? 'var(--error-color)' :
+                         'var(--text-secondary)'
+                }}>
+                  {summary.trend}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.75rem' }}>
+                  Change
+                </td>
+                <td style={{
+                  padding: '0.75rem',
+                  textAlign: 'right',
+                  fontWeight: 'bold',
+                  color: summary.change_percent > 0 ? 'var(--success-color)' :
+                         summary.change_percent < 0 ? 'var(--error-color)' :
+                         'var(--text-secondary)'
+                }}>
+                  {summary.change_percent !== undefined && summary.change_percent !== null ? `${summary.change_percent > 0 ? '+' : ''}${summary.change_percent.toFixed(1)}%` : 'N/A'}
+                </td>
+              </tr>
+            </>
+          )}
         </tbody>
       </table>
     </div>

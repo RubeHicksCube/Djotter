@@ -42,6 +42,33 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
     }));
   }
 
+  // Transform data for counters and timers (treat as numeric)
+  if (type === 'counters' || type === 'timers') {
+    chartData = data.map(item => ({
+      date: item.date,
+      value: item.value !== undefined && item.value !== null ? parseFloat(item.value.toFixed(2)) : null,
+      min: item.min !== undefined && item.min !== null ? parseFloat(item.min.toFixed(2)) : null,
+      max: item.max !== undefined && item.max !== null ? parseFloat(item.max.toFixed(2)) : null,
+      avg: item.avg !== undefined && item.avg !== null ? parseFloat(item.avg.toFixed(2)) : null,
+      sum: item.sum !== undefined && item.sum !== null ? parseFloat(item.sum.toFixed(2)) : null,
+      count: item.count
+    }));
+
+    // Smart Y-axis scaling for narrow ranges
+    const allValues = chartData.flatMap(d => [d.value, d.min, d.max, d.avg].filter(v => v !== null && v !== undefined));
+    if (allValues.length > 0) {
+      const dataMin = Math.min(...allValues);
+      const dataMax = Math.max(...allValues);
+      const range = dataMax - dataMin;
+
+      // If range is narrow (less than 20% of the max value), add padding
+      if (range < dataMax * 0.2 || range < 10) {
+        const padding = Math.max(range * 0.1, 5);
+        yAxisDomain = [Math.floor(dataMin - padding), Math.ceil(dataMax + padding)];
+      }
+    }
+  }
+
   // Transform data for fields
   if (type === 'fields') {
     if (fieldType === 'boolean') {
@@ -149,9 +176,13 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
     return null;
   };
 
-  // For bar charts with numeric/currency fields, create summary data instead of daily data
+  // For bar charts with numeric/currency fields or trackers, create summary data instead of daily data
   let barChartData = chartData;
-  if (chartType === 'bar' && type === 'fields' && (fieldType === 'number' || fieldType === 'currency') && chartData.length > 0) {
+  if (chartType === 'bar' && (
+    (type === 'fields' && (fieldType === 'number' || fieldType === 'currency')) ||
+    type === 'counters' ||
+    type === 'timers'
+  ) && chartData.length > 0) {
     // Calculate overall statistics across all dates
     const allValues = chartData.map(d => d.value).filter(v => v !== null && v !== undefined);
     const allAvgs = chartData.map(d => d.avg).filter(v => v !== null && v !== undefined);
@@ -343,12 +374,59 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
                 />
               </>
             )}
+
+            {(type === 'counters' || type === 'timers') && chartData.length > 0 && (
+              <>
+                {chartData[0].value !== undefined && chartData[0].value !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#7B68EE"
+                    strokeWidth={2}
+                    name="Value"
+                    dot={{ r: 4 }}
+                  />
+                )}
+                {chartData[0].avg !== undefined && chartData[0].avg !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="avg"
+                    stroke="#2196F3"
+                    strokeWidth={2}
+                    name="Average"
+                    dot={{ r: 4 }}
+                  />
+                )}
+                {chartData[0].min !== undefined && chartData[0].min !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="min"
+                    stroke="#FF9800"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    name="Min"
+                    dot={{ r: 3 }}
+                  />
+                )}
+                {chartData[0].max !== undefined && chartData[0].max !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="max"
+                    stroke="#4CAF50"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    name="Max"
+                    dot={{ r: 3 }}
+                  />
+                )}
+              </>
+            )}
           </LineChart>
         ) : (
           <BarChart data={barChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis
-              dataKey={type === 'fields' && (fieldType === 'number' || fieldType === 'currency') ? 'metric' : 'date'}
+              dataKey={(type === 'fields' && (fieldType === 'number' || fieldType === 'currency')) || type === 'counters' || type === 'timers' ? 'metric' : 'date'}
               stroke="var(--text-secondary)"
               style={{ fontSize: '0.875rem' }}
             />
@@ -388,6 +466,15 @@ function DataChart({ type, chartType, data, dataKey, label, fieldType }) {
                 <Bar dataKey="count" fill="#7B68EE" name="Total Entries" />
                 <Bar dataKey="uniqueCount" fill="#4CAF50" name="Unique Values" />
               </>
+            )}
+
+            {(type === 'counters' || type === 'timers') && barChartData.length > 0 && (
+              <Bar dataKey="value" fill="#7B68EE" name="Value">
+                {barChartData.map((entry, index) => {
+                  const colors = ['#7B68EE', '#2196F3', '#4CAF50', '#FF9800', '#E91E63'];
+                  return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                })}
+              </Bar>
             )}
           </BarChart>
         )}

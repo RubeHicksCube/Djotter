@@ -986,6 +986,239 @@ function deleteRedemption(redemptionId, userId) {
   return result.changes > 0;
 }
 
+// ============================================================================
+// TRACKER QUERIES (TIMERS AND COUNTERS)
+// ============================================================================
+
+// Query counter values over time
+function queryCounterValues(userId, counterName, startDate, endDate) {
+  // Get the counter
+  const counter = db.prepare(`
+    SELECT id FROM custom_counters
+    WHERE user_id = ? AND name = ?
+  `).get(userId, counterName);
+
+  if (!counter) {
+    throw new Error('Counter not found');
+  }
+
+  // Query counter values
+  const values = db.prepare(`
+    SELECT date, value
+    FROM custom_counter_values
+    WHERE counter_id = ? AND date >= ? AND date <= ?
+    ORDER BY date
+  `).all(counter.id, startDate, endDate);
+
+  return values.map(v => ({
+    date: v.date,
+    value: v.value || 0
+  }));
+}
+
+// Query timer values from snapshots (since timers don't have historical data in duration_trackers)
+function queryTimerValues(userId, timerName, startDate, endDate) {
+  // Get all snapshots in date range
+  const snapshots = db.prepare(`
+    SELECT date, state_json
+    FROM snapshots
+    WHERE user_id = ? AND date >= ? AND date <= ?
+    ORDER BY date
+  `).all(userId, startDate, endDate);
+
+  // Extract timer values from snapshots
+  const values = snapshots.map(snapshot => {
+    const state = JSON.parse(snapshot.state_json);
+    const timer = state.durationTrackers?.find(t => t.name === timerName);
+
+    return {
+      date: snapshot.date,
+      value: timer ? (timer.elapsed_ms / 1000 / 60) : null // Convert ms to minutes
+    };
+  }).filter(v => v.value !== null);
+
+  return values;
+}
+
+// Helper: Group counter/timer values by period (similar to field values)
+function groupTrackerValuesByPeriod(values, groupBy) {
+  if (!groupBy || groupBy === 'day') {
+    return values.map(v => ({
+      date: v.date,
+      values: [v.value]
+    }));
+  }
+
+  const groups = {};
+
+  values.forEach(item => {
+    let groupKey;
+    const itemDate = new Date(item.date);
+
+    if (groupBy === 'year') {
+      const yearStart = startOfYear(itemDate);
+      groupKey = formatDate(yearStart, 'yyyy-MM-dd');
+    } else if (groupBy === 'week') {
+      const weekStart = startOfWeek(itemDate, { weekStartsOn: 1 });
+      groupKey = formatDate(weekStart, 'yyyy-MM-dd');
+    } else if (groupBy === 'month') {
+      const monthStart = startOfMonth(itemDate);
+      groupKey = formatDate(monthStart, 'yyyy-MM-dd');
+    } else {
+      groupKey = item.date;
+    }
+
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
+    groups[groupKey].push(item.value);
+  });
+
+  return Object.entries(groups).map(([date, vals]) => ({
+    date,
+    values: vals
+  }));
+}
+
+// Calculate aggregations for tracker values
+function calculateTrackerAggregations(values, groupBy) {
+  const grouped = groupTrackerValuesByPeriod(values, groupBy);
+
+  return grouped.map(group => {
+    const vals = group.values.filter(v => v !== null && v !== undefined);
+
+    if (vals.length === 0) {
+      return {
+        date: group.date,
+        value: null,
+        min: null,
+        max: null,
+        avg: null,
+        sum: null,
+        count: 0
+      };
+    }
+
+    const sum = vals.reduce((acc, v) => acc + v, 0);
+    const avg = sum / vals.length;
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+
+    return {
+      date: group.date,
+      value: vals.length === 1 ? vals[0] : null,
+      min: parseFloat(min.toFixed(2)),
+      max: parseFloat(max.toFixed(2)),
+      avg: parseFloat(avg.toFixed(2)),
+      sum: parseFloat(sum.toFixed(2)),
+      count: vals.length
+    };
+  });
+}
+
+// Calculate summary statistics for trackers
+function calculateTrackerSummary(values) {
+  if (!values || values.length === 0) {
+    return {
+      overall_sum: 0,
+      overall_avg: 0,
+      overall_min: 0,
+      overall_max: 0,
+      total_count: 0,
+      trend: 'stable',
+      change_percent: 0
+    };
+  }
+
+  const numericValues = values.map(v => v.value).filter(v => v !== null && v !== undefined);
+
+  if (numericValues.length === 0) {
+    return {
+      overall_sum: 0,
+      overall_avg: 0,
+      overall_min: 0,
+      overall_max: 0,
+      total_count: 0,
+      trend: 'stable',
+      change_percent: 0
+    };
+  }
+
+  const sum = numericValues.reduce((acc, v) => acc + v, 0);
+  const avg = sum / numericValues.length;
+  const min = Math.min(...numericValues);
+  const max = Math.max(...numericValues);
+
+  // Determine trend
+  let trend = 'stable';
+  let changePercent = 0;
+
+  if (numericValues.length >= 2) {
+    const firstValue = numericValues[0];
+    const lastValue = numericValues[numericValues.length - 1];
+
+    if (firstValue !== 0) {
+      changePercent = ((lastValue - firstValue) / firstValue) * 100;
+    } else if (lastValue !== 0) {
+      changePercent = 100;
+    }
+
+    if (changePercent > 5) {
+      trend = 'increasing';
+    } else if (changePercent < -5) {
+      trend = 'decreasing';
+    }
+  }
+
+  return {
+    overall_sum: sum,
+    overall_avg: avg,
+    overall_min: min,
+    overall_max: max,
+    total_count: numericValues.length,
+    trend,
+    change_percent: changePercent
+  };
+}
+
+// Get all counters with values in date range
+function getPopulatedCountersInRange(userId, startDate, endDate) {
+  const counters = db.prepare(`
+    SELECT DISTINCT cc.name
+    FROM custom_counters cc
+    INNER JOIN custom_counter_values ccv ON cc.id = ccv.counter_id
+    WHERE cc.user_id = ? AND ccv.date >= ? AND ccv.date <= ?
+    AND ccv.value IS NOT NULL AND ccv.value > 0
+    ORDER BY cc.name
+  `).all(userId, startDate, endDate);
+
+  return counters.map(c => ({ name: c.name }));
+}
+
+// Get all timers with values in date range (from snapshots)
+function getPopulatedTimersInRange(userId, startDate, endDate) {
+  const snapshots = db.prepare(`
+    SELECT state_json
+    FROM snapshots
+    WHERE user_id = ? AND date >= ? AND date <= ?
+  `).all(userId, startDate, endDate);
+
+  const timerNames = new Set();
+
+  snapshots.forEach(snapshot => {
+    const state = JSON.parse(snapshot.state_json);
+    if (state.durationTrackers) {
+      state.durationTrackers.forEach(timer => {
+        if (timer.elapsed_ms > 0) {
+          timerNames.add(timer.name);
+        }
+      });
+    }
+  });
+
+  return Array.from(timerNames).sort().map(name => ({ name }));
+}
+
 module.exports = {
   // Users
   getAllUsers,
@@ -1069,6 +1302,14 @@ module.exports = {
   getPopulatedFieldsInRange,
   calculateFieldAggregations,
   calculateFieldSummary,
+
+  // Tracker Queries
+  queryCounterValues,
+  queryTimerValues,
+  getPopulatedCountersInRange,
+  getPopulatedTimersInRange,
+  calculateTrackerAggregations,
+  calculateTrackerSummary,
 
   // Custom field templates
   updateCustomFieldTemplate,
